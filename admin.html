@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizLive - Administration</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body data-page="admin">
+    <div class="background-effects">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <header class="main-header">
+        <div class="logo">
+            <span class="logo-icon">⚡</span>
+            <a href="index.html" class="logo-text" style="text-decoration: none;">QuizLive</a>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <span id="sessionName" style="color: var(--text-secondary);"></span>
+            <label class="presenter-mode-toggle" title="Ouvre une fenêtre de présentation">
+                <input type="checkbox" id="presenterToggle" onchange="togglePresenterMode()">
+                <span>📽️ Présentation</span>
+            </label>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                <span>En direct</span>
+            </div>
+            <button class="btn-home" onclick="goToHome()" title="Quitter la session">
+                🚪
+            </button>
+        </div>
+    </header>
+
+    <!-- Admin Login Overlay -->
+    <div id="adminLoginOverlay" style="
+        position: fixed; inset: 0; z-index: 2000;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.85); backdrop-filter: blur(15px);
+        padding: 20px;">
+        
+        <div id="adminLoginBox" style="
+            width: 100%; max-width: 420px;
+            padding: 32px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 24px;
+            background: rgba(20,20,40,0.95);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);">
+            
+            <h2 style="margin-bottom: 24px; font-family:'Space Grotesk',sans-serif; text-align: center;">🔐 Connexion Admin</h2>
+
+            <input id="adminEmail" type="email" placeholder="Email admin"
+                style="width:100%;padding:14px 18px;margin-bottom:14px;border-radius:12px;
+                border:1px solid rgba(255,255,255,0.12);
+                background:rgba(0,0,0,0.3);color:white;font-size:1rem;">
+
+            <input id="adminPass" type="password" placeholder="Mot de passe"
+                style="width:100%;padding:14px 18px;margin-bottom:8px;border-radius:12px;
+                border:1px solid rgba(255,255,255,0.12);
+                background:rgba(0,0,0,0.3);color:white;font-size:1rem;">
+
+            <!-- Bouton Mot de passe oublié -->
+            <div id="forgotPasswordBtn" class="forgot-password-link">
+                🔑 Mot de passe oublié ?
+            </div>
+
+            <button id="adminLoginBtn" class="btn-primary" style="padding: 16px; width:100%; margin-top: 16px;">
+                Se connecter
+            </button>
+
+            <button id="adminCancelBtn" style="
+                margin-top: 12px; width:100%; padding: 14px;
+                border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
+                background: transparent; color: rgba(255,255,255,0.8); cursor:pointer;
+                font-size: 1rem; transition: all 0.3s;">
+                ← Retour accueil
+            </button>
+
+            <div id="adminLoginErr" style="margin-top:16px;color:#fca5a5;display:none;text-align:center;"></div>
+        </div>
+    </div>
+
+    <main class="admin-layout">
+        <!-- Sidebar - Questions List avec scrollbar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Code de la session</p>
+                <div id="sessionCode" class="session-code">------</div>
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-align: center; margin-top: 8px;">
+                    Partagez ce code avec vos participants
+                </p>
+            </div>
+            
+            <h3 style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+                📝 Questions & Slides
+                <span style="font-size: 0.75rem; color: var(--text-muted);">(glisser-déposer)</span>
+            </h3>
+            
+            <!-- Liste scrollable avec max 15 items visibles -->
+            <div id="questionList" class="question-list">
+                <!-- Questions will be populated here -->
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px;">
+                <button class="add-question-btn" onclick="showAddQuestionModal()">
+                    + Ajouter une question
+                </button>
+                
+                <button class="add-question-btn" onclick="showImportSlidesModal()" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">
+                    🖼️ Importer des slides
+                </button>
+                
+                <button class="import-excel-btn" onclick="showImportExcelModal()">
+                    📊 Importer Excel
+                </button>
+                
+                <button class="add-question-btn" onclick="showSaveModal()" style="border-color: var(--accent); color: var(--accent);">
+                    💾 Sauvegarder / Charger
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content - Current Question Display -->
+        <section class="main-content">
+            <div class="content-header">
+                <h2 style="font-family: 'Space Grotesk', sans-serif;">
+                    🎯 Question en cours
+                </h2>
+                <div class="status-badge">
+                    <span id="participantCount">0</span> participants
+                </div>
+            </div>
+            
+            <div id="questionDisplay" class="question-display">
+                <div class="waiting-screen">
+                    <div class="waiting-icon">🎯</div>
+                    <div class="waiting-text">Ajoutez des questions pour commencer</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Panel -->
+        <aside class="results-panel">
+            <div class="panel-title">
+                👥 Participants
+            </div>
+            <div id="participantsList" class="participants-list">
+                <p style="color: var(--text-muted); text-align: center;">En attente de participants...</p>
+            </div>
+            
+            <div class="panel-title" style="margin-top: 32px;">
+                🏆 Classement
+            </div>
+            <div id="leaderboard" class="leaderboard">
+                <p style="color: var(--text-muted); text-align: center;">Pas encore de classement</p>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Add Question Modal -->
+    <div id="addQuestionModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>➕ Nouvelle question</h2>
+            
+            <form id="addQuestionForm" onsubmit="saveQuestion(event)">
+                <input type="hidden" id="selectedQuestionType" value="mcq">
+                
+                <div class="question-type-selector">
+                    <button type="button" class="type-btn active" data-type="mcq" onclick="selectQuestionType('mcq')">
+                        <span class="type-icon">📝</span>
+                        QCM
+                    </button>
+                    <button type="button" class="type-btn" data-type="truefalse" onclick="selectQuestionType('truefalse')">
+                        <span class="type-icon">✓✗</span>
+                        Vrai/Faux
+                    </button>
+                    <button type="button" class="type-btn" data-type="wordcloud" onclick="selectQuestionType('wordcloud')">
+                        <span class="type-icon">☁️</span>
+                        Nuage de mots
+                    </button>
+                    <button type="button" class="type-btn" data-type="ranking" onclick="selectQuestionType('ranking')">
+                        <span class="type-icon">📊</span>
+                        Classement
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label>Texte de la question</label>
+                    <input type="text" id="questionText" placeholder="Ex: Quelle est la capitale de la France ?" required>
+                </div>
+                
+                <div id="questionOptionsContainer">
+                    <!-- Dynamic options based on question type -->
+                </div>
+                
+                <button type="submit" class="btn-primary" style="margin-top: 16px;">
+                    Ajouter la question
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Question Modal -->
+    <div id="editQuestionModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>✏️ Modifier la question</h2>
+            
+            <form id="editQuestionForm" onsubmit="updateQuestion(event)">
+                <input type="hidden" id="editSelectedQuestionType" value="mcq">
+                
+                <div class="form-group">
+                    <label>Texte de la question</label>
+                    <input type="text" id="editQuestionText" placeholder="Texte de la question" required>
+                </div>
+                
+                <div id="editQuestionOptionsContainer">
+                    <!-- Dynamic options -->
+                </div>
+                
+                <button type="submit" class="btn-primary" style="margin-top: 16px;">
+                    💾 Enregistrer les modifications
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import Excel Modal -->
+    <div id="importExcelModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>📊 Importer des questions depuis Excel</h2>
+            
+            <div class="import-instructions">
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    Format du fichier Excel attendu :
+                </p>
+                <table class="import-format-table">
+                    <thead>
+                        <tr>
+                            <th>Question</th>
+                            <th>Réponse 1</th>
+                            <th>Réponse 2</th>
+                            <th>Réponse 3</th>
+                            <th>Réponse 4</th>
+                            <th>Correcte</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Capitale de France ?</td>
+                            <td>Paris</td>
+                            <td>Lyon</td>
+                            <td>Marseille</td>
+                            <td>Toulouse</td>
+                            <td>1</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 12px;">
+                    • Colonne "Correcte" : numéro de la bonne réponse (1, 2, 3 ou 4)<br>
+                    • La première ligne (en-têtes) sera ignorée
+                </p>
+            </div>
+            
+            <div class="form-group" style="margin-top: 24px;">
+                <label class="file-input-label" for="excelFileInput">
+                    📁 Choisir un fichier Excel
+                </label>
+                <input type="file" id="excelFileInput" accept=".xlsx,.xls" onchange="handleExcelImport(event)" style="display: none;">
+            </div>
+            
+            <button id="importExcelBtn" class="btn-primary" onclick="document.getElementById('excelFileInput').click()">
+                Sélectionner le fichier
+            </button>
+        </div>
+    </div>
+
+    <!-- Import Slides Modal -->
+    <div id="importSlidesModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>🖼️ Importer des slides</h2>
+            
+            <div class="import-instructions">
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    Importez des images de vos slides PowerPoint pour les afficher entre les questions.
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">
+                    💡 Astuce : Exportez vos slides PowerPoint en images (PNG/JPG) avant de les importer ici.<br>
+                    Dans PowerPoint : Fichier → Exporter → Images
+                </p>
+            </div>
+            
+            <div class="form-group" style="margin-top: 24px;">
+                <label class="file-input-label" for="slidesFileInput">
+                    📁 Sélectionner des images
+                </label>
+                <input type="file" id="slidesFileInput" accept="image/*" multiple onchange="handleSlidesImport(event)" style="display: none;">
+            </div>
+            
+            <button id="importSlidesBtn" class="btn-primary" onclick="document.getElementById('slidesFileInput').click()">
+                Sélectionner les images
+            </button>
+        </div>
+    </div>
+
+    <!-- Save/Load Session Modal -->
+    <div id="saveSessionModal" class="modal">
+        <div class="modal-content" style="max-width: 550px;">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>💾 Sauvegarder / Charger une session</h2>
+            
+            <div style="margin-bottom: 24px;">
+                <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-secondary);">📥 Sauvegarder la session actuelle</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">
+                    Sauvegardez vos questions et slides pour les réutiliser plus tard.
+                </p>
+                <button class="btn-primary" onclick="saveSession()" style="width: 100%;">
+                    💾 Sauvegarder maintenant
+                </button>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 24px 0;">
+            
+            <div>
+                <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-secondary);">📤 Sessions sauvegardées</h3>
+                <div id="savedSessionsList" style="max-height: 250px; overflow-y: auto;">
+                    <p style="color: var(--text-muted); text-align: center;">Chargement...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SheetJS Library for Excel Import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

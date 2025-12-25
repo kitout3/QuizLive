@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizLive - Quiz Interactif en Direct</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="home-page">
+    <div class="background-effects">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+        <div class="grid-overlay"></div>
+        <!-- Graphique animé en fond -->
+        <div class="animated-chart-bg">
+            <svg class="chart-svg" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:rgba(99,102,241,0.4)"/>
+                        <stop offset="100%" style="stop-color:rgba(99,102,241,0)"/>
+                    </linearGradient>
+                </defs>
+                <path class="chart-line" d="M0,150 Q50,120 100,130 T200,100 T300,80 T400,60" fill="none" stroke="rgba(99,102,241,0.6)" stroke-width="2"/>
+                <path class="chart-area" d="M0,150 Q50,120 100,130 T200,100 T300,80 T400,60 L400,200 L0,200 Z" fill="url(#chartGradient)"/>
+                <path class="chart-line-2" d="M0,180 Q50,160 100,170 T200,140 T300,150 T400,120" fill="none" stroke="rgba(16,185,129,0.5)" stroke-width="2"/>
+            </svg>
+            <!-- Barres animées -->
+            <div class="animated-bars">
+                <div class="bar bar-1"></div>
+                <div class="bar bar-2"></div>
+                <div class="bar bar-3"></div>
+                <div class="bar bar-4"></div>
+                <div class="bar bar-5"></div>
+            </div>
+        </div>
+    </div>
+
+    <header class="main-header">
+        <div class="logo">
+            <span class="logo-icon">⚡</span>
+            <span class="logo-text">QuizLive</span>
+        </div>
+    </header>
+
+    <main class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                <span class="title-line">Quiz Interactifs</span>
+                <span class="title-line gradient-text">En Temps Réel</span>
+            </h1>
+            <p class="hero-subtitle">
+                Créez des quiz engageants, nuages de mots et sondages pour captiver votre audience.
+                Résultats instantanés et classements en direct.
+            </p>
+
+            <div class="action-cards">
+                <div class="action-card create-card" onclick="showCreateModal()">
+                    <div class="card-icon">🎯</div>
+                    <h3>Créer un Quiz</h3>
+                    <p>Lancez une nouvelle session interactive</p>
+                    <div class="card-arrow">→</div>
+                </div>
+
+                <div class="action-card join-card" onclick="showJoinModal()">
+                    <div class="card-icon">🚀</div>
+                    <h3>Rejoindre</h3>
+                    <p>Participez avec un code de session</p>
+                    <div class="card-arrow">→</div>
+                </div>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature">
+                    <span class="feature-icon">📊</span>
+                    <span>Quiz QCM</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">☁️</span>
+                    <span>Nuage de mots</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📈</span>
+                    <span>Classements</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🖼️</span>
+                    <span>Slides PPT</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">⚡</span>
+                    <span>Temps réel</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="hero-visual">
+            <div class="floating-card card-1">
+                <div class="mini-chart"></div>
+            </div>
+            <div class="floating-card card-2">
+                <div class="mini-wordcloud">
+                    <span style="font-size: 24px;">Innovation</span>
+                    <span style="font-size: 16px;">Tech</span>
+                    <span style="font-size: 20px;">Quiz</span>
+                    <span style="font-size: 14px;">Fun</span>
+                </div>
+            </div>
+            <div class="floating-card card-3">
+                <div class="mini-leaderboard">
+                    <div class="lb-row">🥇 Alice - 950</div>
+                    <div class="lb-row">🥈 Bob - 820</div>
+                    <div class="lb-row">🥉 Charlie - 780</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Créer Quiz (avec login admin) -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>🎯 Créer un nouveau Quiz</h2>
+            
+            <!-- Étape 1: Login Admin -->
+            <div id="adminLoginStep">
+                <p class="modal-info">🔒 Connexion administrateur requise</p>
+                <div class="form-group">
+                    <label>Email admin</label>
+                    <input type="email" id="createAdminEmail" placeholder="admin@exemple.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="createAdminPass" placeholder="••••••••" required>
+                </div>
+                <div id="createLoginErr" class="error-message"></div>
+                <button type="button" class="btn-primary" onclick="loginAdminForCreate()">
+                    🔐 Se connecter
+                </button>
+            </div>
+            
+            <!-- Étape 2: Créer la session -->
+            <div id="createSessionStep" style="display: none;">
+                <p class="modal-success">✅ Connecté en tant qu'admin</p>
+                <form id="createForm" onsubmit="createQuizAfterLogin(event)">
+                    <div class="form-group">
+                        <label>Nom de votre session</label>
+                        <input type="text" id="sessionName" placeholder="Ex: Quiz Culture Générale" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Votre pseudo (Admin)</label>
+                        <input type="text" id="adminName" placeholder="Votre nom" required>
+                    </div>
+                    <button type="submit" class="btn-primary">🚀 Créer la session</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Rejoindre -->
+    <div id="joinModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModals()">&times;</button>
+            <h2>🚀 Rejoindre un Quiz</h2>
+            <form id="joinForm" onsubmit="joinQuiz(event)">
+                <div class="form-group">
+                    <label>Code de la session</label>
+                    <input type="text" id="sessionCode" placeholder="Ex: ABC123" maxlength="6" style="text-transform: uppercase;" required>
+                </div>
+                <div class="form-group">
+                    <label>Votre pseudo</label>
+                    <input type="text" id="playerName" placeholder="Votre nom" required>
+                </div>
+                <button type="submit" class="btn-primary">Rejoindre</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
