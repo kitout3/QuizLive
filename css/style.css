@@ -314,7 +314,7 @@ body {
     animation: floatCard 6s infinite ease-in-out;
 }
 
-.card-1 { top: 10%; left: 10%; width: 180px; height: 130px; }
+
 .card-2 { top: 30%; right: 10%; width: 200px; animation-delay: -2s; }
 .card-3 { bottom: 15%; left: 20%; width: 180px; animation-delay: -4s; }
 
