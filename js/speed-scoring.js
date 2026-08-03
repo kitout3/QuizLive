@@ -17,12 +17,16 @@
 
     const serverNow = () => Date.now() + serverTimeOffset;
 
+    function getElapsedWholeSeconds(startedAt, answeredAt) {
+        if (!startedAt || !answeredAt) return QUESTION_DURATION_SECONDS;
+        return Math.max(0, Math.floor((answeredAt - startedAt) / 1000));
+    }
+
     function calculateSpeedPoints(startedAt, answeredAt) {
-        if (!startedAt || !answeredAt) return MIN_CORRECT_POINTS;
-        const elapsedSeconds = Math.max(0, (answeredAt - startedAt) / 1000);
+        const elapsedSeconds = getElapsedWholeSeconds(startedAt, answeredAt);
         return Math.max(
             MIN_CORRECT_POINTS,
-            Math.round(MAX_CORRECT_POINTS - (elapsedSeconds * POINTS_LOST_PER_SECOND))
+            MAX_CORRECT_POINTS - (elapsedSeconds * POINTS_LOST_PER_SECOND)
         );
     }
 
@@ -40,6 +44,9 @@
         const target = document.querySelector('.player-question-number');
         if (!target) return;
 
+        const existingTimer = document.getElementById('speedQuestionTimer');
+        if (existingTimer) existingTimer.remove();
+
         const timer = document.createElement('div');
         timer.id = 'speedQuestionTimer';
         timer.style.cssText = [
@@ -56,13 +63,14 @@
         target.insertAdjacentElement('afterend', timer);
 
         const refresh = () => {
-            const elapsed = Math.max(0, serverNow() - Number(question.startedAt));
-            const remaining = Math.max(0, QUESTION_DURATION_SECONDS * 1000 - elapsed);
-            const seconds = Math.ceil(remaining / 1000);
-            const potentialPoints = calculateSpeedPoints(Number(question.startedAt), serverNow());
-            timer.textContent = `⏱️ ${seconds}s — jusqu’à ${potentialPoints} points`;
+            const now = serverNow();
+            const elapsedWholeSeconds = getElapsedWholeSeconds(Number(question.startedAt), now);
+            const remainingSeconds = Math.max(0, QUESTION_DURATION_SECONDS - elapsedWholeSeconds);
+            const potentialPoints = calculateSpeedPoints(Number(question.startedAt), now);
 
-            if (remaining <= 0) {
+            timer.textContent = `⏱️ ${remainingSeconds}s — ${potentialPoints} points`;
+
+            if (remainingSeconds <= 0) {
                 clearQuestionTimer();
                 timer.textContent = '⏱️ Temps écoulé — 0 point';
             }
@@ -138,15 +146,13 @@
             ? calculateSpeedPoints(Number(question.startedAt), answeredAt)
             : 0;
 
-        // Réserver d'abord uniquement cette réponse. Cela évite la transaction
-        // sur l'objet participant complet qui échouait à partir de la 2e question.
         answerRef.transaction(currentAnswer => {
             if (currentAnswer !== null) return;
             return Number(answerIndex);
         }, async (error, committed) => {
             if (error) {
                 console.error('Erreur enregistrement réponse :', error);
-                showToast('La réponse n’a pas pu être enregistrée', 'error');
+                showToast(`La réponse n’a pas pu être enregistrée : ${error.message}`, 'error');
                 return;
             }
 
@@ -156,12 +162,11 @@
             }
 
             try {
+                const elapsedSeconds = getElapsedWholeSeconds(Number(question.startedAt), answeredAt);
                 const updates = {};
                 updates[`${participantPath}/answerTimes/${questionIndex}`] = {
                     answeredAt,
-                    elapsedMs: question.startedAt
-                        ? Math.max(0, answeredAt - Number(question.startedAt))
-                        : null
+                    elapsedSeconds
                 };
                 updates[`${participantPath}/answerPoints/${questionIndex}`] = awardedPoints;
                 await database.ref().update(updates);
@@ -173,10 +178,10 @@
                 }
             } catch (writeError) {
                 console.error('Erreur mise à jour du score :', writeError);
-                showToast('Réponse enregistrée, mais le score n’a pas pu être mis à jour', 'error');
+                showToast(`Réponse enregistrée, score non mis à jour : ${writeError.message}`, 'error');
             }
         }, false);
     };
 
-    console.log('✅ Timer et notation par rapidité activés');
+    console.log('✅ Timer activé : 100 points puis -5 points par seconde entière');
 })();
