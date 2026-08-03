@@ -4,9 +4,9 @@
     'use strict';
 
     const QUESTION_DURATION_SECONDS = 30;
-    const MAX_CORRECT_POINTS = 1000;
-    const MIN_CORRECT_POINTS = 100;
-    const POINTS_LOST_PER_SECOND = 30;
+    const MAX_CORRECT_POINTS = 100;
+    const MIN_CORRECT_POINTS = 0;
+    const POINTS_LOST_PER_SECOND = 5;
 
     let serverTimeOffset = 0;
     let timerInterval = null;
@@ -64,7 +64,7 @@
 
             if (remaining <= 0) {
                 clearQuestionTimer();
-                timer.textContent = `⏱️ Temps écoulé — ${MIN_CORRECT_POINTS} points minimum`;
+                timer.textContent = '⏱️ Temps écoulé — 0 point';
             }
         };
 
@@ -78,8 +78,8 @@
         if (awarded === undefined || awarded === null) return;
 
         const feedback = document.querySelector('.feedback-message');
-        if (feedback && Number(awarded) > 0) {
-            feedback.textContent = `Bonne réponse ! +${Number(awarded)} points`;
+        if (feedback) {
+            feedback.textContent = `Bonne réponse ! +${Number(awarded)} point${Number(awarded) > 1 ? 's' : ''}`;
         }
     }
 
