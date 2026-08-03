@@ -1,6 +1,4 @@
 // Firebase Configuration - Generated at build time
-// DO NOT commit real values to this file
-
 const firebaseConfig = {
     apiKey: "%%FIREBASE_API_KEY%%",
     authDomain: "%%FIREBASE_AUTH_DOMAIN%%",
@@ -11,12 +9,14 @@ const firebaseConfig = {
     appId: "%%FIREBASE_APP_ID%%"
 };
 
-const ADMIN_UID_CONFIG = "%%FIREBASE_ADMIN_UID%%";
+// L'UID de l'organisateur connecté est utilisé par le code historique.
+// Le secret ADMIN reste un compte de secours pour l'administration globale.
+const ADMIN_UID_CONFIG = localStorage.getItem('organizerUid') || "%%FIREBASE_ADMIN_UID%%";
+const PPTX_CONVERTER_URL_CONFIG = "%%PPTX_CONVERTER_URL%%";
 
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// Compatibilité avec l'initialisation historique d'app.js qui lit localStorage.
 const tabQuizSession = sessionStorage.getItem('quizSession');
 if (tabQuizSession) localStorage.setItem('quizSession', tabQuizSession);
 
@@ -32,20 +32,19 @@ function loadQuizModule(src) {
 
 window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
-
     try {
+        await loadQuizModule('js/organizer-auth.js?v=10');
+
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=8');
-            await loadQuizModule('js/participant-guard.js?v=8');
+            await loadQuizModule('js/player-session-auth.js?v=10');
+            await loadQuizModule('js/participant-guard.js?v=10');
         }
-
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=8');
+            await loadQuizModule('js/speed-scoring.js?v=10');
         }
-
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=8');
-            await loadQuizModule('js/pptx-import.js?v=8');
+            await loadQuizModule('js/participant-guard.js?v=10');
+            await loadQuizModule('js/pptx-import.js?v=10');
         }
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
