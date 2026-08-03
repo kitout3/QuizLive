@@ -10,7 +10,7 @@
         scripts: [
             'https://code.jquery.com/jquery-1.11.3.min.js',
             'https://pptx.js.org/js/jszip.min.js',
-            'https://pptx.js.org/js/filereader.js',
+            'https://cdn.jsdelivr.net/gh/meshesha/FileReader.js@master/filereader.js',
             'https://pptx.js.org/js/d3.min.js',
             'https://pptx.js.org/js/nv.d3.min.js',
             'https://pptx.js.org/js/pptxjs.js',
