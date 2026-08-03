@@ -9,8 +9,6 @@ const firebaseConfig = {
     appId: "%%FIREBASE_APP_ID%%"
 };
 
-// L'UID de l'organisateur connecté est utilisé par le code historique.
-// Le secret ADMIN reste un compte de secours pour l'administration globale.
 const ADMIN_UID_CONFIG = localStorage.getItem('organizerUid') || "%%FIREBASE_ADMIN_UID%%";
 const PPTX_CONVERTER_URL_CONFIG = "%%PPTX_CONVERTER_URL%%";
 
@@ -33,18 +31,19 @@ function loadQuizModule(src) {
 window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
     try {
-        await loadQuizModule('js/organizer-auth.js?v=11');
+        await loadQuizModule('js/organizer-auth.js?v=12');
+        await loadQuizModule('js/platform-features.js?v=12');
 
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=11');
-            await loadQuizModule('js/participant-guard.js?v=11');
+            await loadQuizModule('js/player-session-auth.js?v=12');
+            await loadQuizModule('js/participant-guard.js?v=12');
         }
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=11');
+            await loadQuizModule('js/speed-scoring.js?v=12');
         }
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=11');
-            await loadQuizModule('js/pptx-import.js?v=11');
+            await loadQuizModule('js/participant-guard.js?v=12');
+            await loadQuizModule('js/pptx-import.js?v=12');
         }
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
