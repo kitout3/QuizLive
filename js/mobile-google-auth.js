@@ -1,14 +1,15 @@
-// QuizLive - authentification Google adaptée aux mobiles
+// QuizLive - authentification Google mobile sans gestionnaire Firebase
 (() => {
   'use strict';
 
+  const GOOGLE_CLIENT_ID = '875684500848-5mpgg8bpu5obi520qr0jqc7ngvnrqej0.apps.googleusercontent.com';
+  const REDIRECT_URI = 'https://kitout3.github.io/QuizLive/index.html';
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
     || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
 
   if (!isMobile) return;
 
-  const auth = firebase.auth();
-  let redirectPending = false;
+  let signInPending = false;
 
   function showError(error) {
     const message = window.QuizOrganizer?.authMessage?.(error)
@@ -19,51 +20,69 @@
     else if (typeof window.showToast === 'function') window.showToast(message, 'error');
   }
 
-  async function mobileGoogleSignIn() {
-    if (redirectPending) return;
-    redirectPending = true;
-
-    try {
-      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      sessionStorage.setItem('quizliveGoogleMobileReturn', '1');
-      sessionStorage.setItem('quizliveGoogleReturnUrl', location.href);
-
-      const provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await auth.signInWithRedirect(provider);
-    } catch (error) {
-      redirectPending = false;
-      sessionStorage.removeItem('quizliveGoogleMobileReturn');
-      showError(error);
-      throw error;
-    }
+  function randomState() {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
   }
 
-  async function finishMobileRedirect() {
-    if (sessionStorage.getItem('quizliveGoogleMobileReturn') !== '1') return;
+  async function mobileGoogleSignIn() {
+    if (signInPending) return;
+    signInPending = true;
+
+    const state = randomState();
+    sessionStorage.setItem('quizliveGoogleOAuthState', state);
+    sessionStorage.setItem('quizliveGoogleMobileReturn', '1');
+
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'token',
+      scope: 'openid email profile',
+      include_granted_scopes: 'true',
+      prompt: 'select_account',
+      state
+    });
+
+    // Redirection directe vers Google : aucun passage par firebaseapp.com.
+    location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  }
+
+  async function finishMobileOAuth() {
+    if (!location.hash || !location.hash.includes('access_token=')) return;
+
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const accessToken = hash.get('access_token');
+    const returnedState = hash.get('state');
+    const expectedState = sessionStorage.getItem('quizliveGoogleOAuthState');
+    const oauthError = hash.get('error');
+
+    // Supprime immédiatement le jeton de l'URL visible et de l'historique.
+    history.replaceState({}, document.title, REDIRECT_URI);
 
     try {
-      const result = await auth.getRedirectResult();
-      const user = result?.user || auth.currentUser;
-      if (!user || user.isAnonymous) return;
+      if (oauthError) throw new Error(hash.get('error_description') || oauthError);
+      if (!accessToken) throw new Error('Google n’a retourné aucun jeton de connexion.');
+      if (!expectedState || returnedState !== expectedState) {
+        throw new Error('La vérification de sécurité Google a échoué. Recommencez la connexion.');
+      }
 
-      await window.QuizOrganizer?.saveOrganizerProfile?.(user, user.displayName);
+      await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      const credential = firebase.auth.GoogleAuthProvider.credential(null, accessToken);
+      const result = await firebase.auth().signInWithCredential(credential);
+      await window.QuizOrganizer?.saveOrganizerProfile?.(result.user, result.user.displayName);
       localStorage.setItem('quizliveHomeRole', 'organizer');
-      sessionStorage.removeItem('quizliveGoogleMobileReturn');
-      sessionStorage.removeItem('quizliveGoogleReturnUrl');
 
+      sessionStorage.removeItem('quizliveGoogleOAuthState');
+      sessionStorage.removeItem('quizliveGoogleMobileReturn');
       if (typeof window.showToast === 'function') window.showToast('Connexion Google réussie');
-
-      // Met à jour l'accueil sans ouvrir une seconde fenêtre.
-      setTimeout(() => {
-        if (location.pathname.endsWith('/index.html') || location.pathname.endsWith('/QuizLive/')) {
-          location.replace(`${location.origin}${location.pathname}?google=success`);
-        }
-      }, 150);
+      setTimeout(() => location.replace(`${REDIRECT_URI}?google=success`), 150);
     } catch (error) {
+      sessionStorage.removeItem('quizliveGoogleOAuthState');
       sessionStorage.removeItem('quizliveGoogleMobileReturn');
-      sessionStorage.removeItem('quizliveGoogleReturnUrl');
       showError(error);
+    } finally {
+      signInPending = false;
     }
   }
 
@@ -73,7 +92,7 @@
       return;
     }
     window.QuizOrganizer.signInWithGoogle = mobileGoogleSignIn;
-    finishMobileRedirect();
+    finishMobileOAuth();
   }
 
   installOverride();
