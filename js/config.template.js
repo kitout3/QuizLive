@@ -31,27 +31,26 @@ function loadQuizModule(src) {
 window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
     try {
-        await loadQuizModule('js/organizer-auth.js?v=17');
-        await loadQuizModule('js/platform-features.js?v=17');
+        await loadQuizModule('js/organizer-auth.js?v=18');
+        await loadQuizModule('js/platform-features.js?v=18');
 
         if (document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/home-role-flow.js?v=17');
+            await loadQuizModule('js/home-role-flow.js?v=18');
         }
 
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=17');
-            await loadQuizModule('js/participant-guard.js?v=17');
+            await loadQuizModule('js/player-session-auth.js?v=18');
+            await loadQuizModule('js/participant-guard.js?v=18');
         }
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=17');
+            await loadQuizModule('js/speed-scoring.js?v=18');
         }
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=17');
-            await loadQuizModule('js/pptx-import.js?v=17');
+            await loadQuizModule('js/participant-guard.js?v=18');
+            await loadQuizModule('js/pptx-import.js?v=18');
         }
 
-        // Toujours chargé en dernier : neutralise les anciens flux concurrents.
-        await loadQuizModule('js/unified-runtime.js?v=17');
+        await loadQuizModule('js/unified-runtime.js?v=18');
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
     }
