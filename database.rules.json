@@ -1,23 +1,68 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
+
     "organizers": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['uid','email','role','active']) && newData.child('uid').val() === auth.uid && newData.child('role').val() === 'organizer'"
+        ".validate": "newData.hasChildren(['uid','email','role','active']) && newData.child('uid').val() === auth.uid && newData.child('role').val() === 'organizer' && newData.child('active').isBoolean()"
       }
     },
+
+    "organizerSessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "$code": {
+          ".validate": "newData.hasChildren(['code','name','createdAt','status']) && newData.child('code').val() === $code"
+        }
+      }
+    },
+
     "sessions": {
       "$code": {
         ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && root.child('organizers').child(auth.uid).child('active').val() === true && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid))",
+
+        "ownerUid": {
+          ".validate": "newData.isString() && ((!data.exists() && newData.val() === auth.uid) || newData.val() === data.val())"
+        },
+
         "participants": {
           "$participantId": {
-            ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)"
+            ".read": "auth != null",
+            ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
+
+            "answers": {
+              "$questionIndex": {
+                ".write": "auth != null && auth.uid === $participantId && !data.exists()"
+              }
+            },
+
+            "answerTimes": {
+              "$questionIndex": {
+                ".write": "auth != null && auth.uid === $participantId"
+              }
+            },
+
+            "answerPoints": {
+              "$questionIndex": {
+                ".write": "auth != null && auth.uid === $participantId",
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+              }
+            },
+
+            "score": {
+              ".write": "auth != null && auth.uid === $participantId",
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() || newData.val() >= data.val())"
+            }
           }
         }
       }
     },
+
     "savedSessions": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
