@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const PENDING_KEY = 'quizliveGoogleAuthPending';
+  let redirectStarted = false;
 
   async function saveProfile(user) {
     if (!user) return;
@@ -10,6 +10,7 @@
       await window.QuizOrganizer.saveOrganizerProfile(user, user.displayName);
       return;
     }
+
     await database.ref(`organizers/${user.uid}`).update({
       uid: user.uid,
       email: user.email || '',
@@ -22,82 +23,46 @@
     });
   }
 
-  function showAuthError(message) {
-    const box = document.getElementById('orgAuthError');
-    if (box) box.textContent = message || '';
-    else if (message && typeof showToast === 'function') showToast(message, 'error');
+  async function signInWithGoogleRedirect() {
+    if (redirectStarted) return;
+    redirectStarted = true;
+
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    sessionStorage.setItem('quizliveGoogleRedirectPending', '1');
+    return firebase.auth().signInWithRedirect(provider);
   }
 
-  function friendlyMessage(error) {
-    const messages = {
-      'auth/popup-closed-by-user': 'La connexion Google a été interrompue.',
-      'auth/cancelled-popup-request': 'Une connexion Google est déjà en cours.',
-      'auth/unauthorized-domain': 'Le domaine kitout3.github.io doit être ajouté aux domaines autorisés dans Firebase Authentication.',
-      'auth/operation-not-allowed': 'Le fournisseur Google doit être activé dans Firebase Authentication.',
-      'auth/account-exists-with-different-credential': 'Cette adresse existe déjà avec une autre méthode de connexion.',
-      'auth/network-request-failed': 'Connexion réseau impossible. Réessayez.'
-    };
-    return messages[error?.code] || error?.message || 'Connexion Google impossible.';
-  }
-
-  async function startGoogleRedirect(button) {
-    if (sessionStorage.getItem(PENDING_KEY) === '1') return;
-    sessionStorage.setItem(PENDING_KEY, '1');
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Redirection vers Google…';
-    }
-    showAuthError('');
-    try {
-      await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      const provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await firebase.auth().signInWithRedirect(provider);
-    } catch (error) {
-      sessionStorage.removeItem(PENDING_KEY);
-      if (button) {
-        button.disabled = false;
-        button.textContent = 'G Continuer avec Google';
-      }
-      showAuthError(friendlyMessage(error));
-    }
-  }
-
-  async function completeRedirect() {
+  async function finishRedirect() {
     try {
       const result = await firebase.auth().getRedirectResult();
-      sessionStorage.removeItem(PENDING_KEY);
-      if (!result?.user) return;
-      await saveProfile(result.user);
-      localStorage.setItem('quizliveHomeRole', 'organizer');
-      if (typeof showToast === 'function') showToast('Connexion Google réussie');
-      location.replace(`${location.origin}${location.pathname}`);
+      if (result?.user) {
+        await saveProfile(result.user);
+        sessionStorage.removeItem('quizliveGoogleRedirectPending');
+        localStorage.setItem('organizerUid', result.user.uid);
+        localStorage.setItem('organizerEmail', result.user.email || '');
+        if (typeof showToast === 'function') showToast('Connexion Google réussie');
+      }
     } catch (error) {
-      sessionStorage.removeItem(PENDING_KEY);
-      showAuthError(friendlyMessage(error));
+      console.error('Retour connexion Google :', error);
+      sessionStorage.removeItem('quizliveGoogleRedirectPending');
+      window.__quizGoogleRedirectError = error;
     }
   }
 
-  function installButton() {
-    const current = document.getElementById('orgGoogleBtn');
-    if (!current || current.dataset.redirectAuth === '1') return false;
-    const button = current.cloneNode(true);
-    button.dataset.redirectAuth = '1';
-    current.replaceWith(button);
-    button.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      startGoogleRedirect(button);
-    }, true);
+  function overrideGoogleAuth() {
+    if (!window.QuizOrganizer) return false;
+    window.QuizOrganizer.signInWithGoogle = signInWithGoogleRedirect;
     return true;
   }
 
-  completeRedirect();
-  if (!installButton()) {
-    const observer = new MutationObserver(() => {
-      if (installButton()) observer.disconnect();
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-    setTimeout(() => observer.disconnect(), 20000);
+  if (!overrideGoogleAuth()) {
+    const timer = setInterval(() => {
+      if (overrideGoogleAuth()) clearInterval(timer);
+    }, 50);
+    setTimeout(() => clearInterval(timer), 10000);
   }
+
+  finishRedirect();
 })();
