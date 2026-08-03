@@ -15,7 +15,7 @@
       "$organizationId": {
         ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).exists())",
         ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid)",
-        ".validate": "newData.hasChildren(['id','name','type','ownerUid','plan','active']) && newData.child('id').val() === $organizationId && newData.child('name').isString() && newData.child('name').val().length >= 2 && newData.child('type').val() in ['company','school','association'] && newData.child('ownerUid').isString() && newData.child('plan').val() in ['free','pro','business','enterprise'] && newData.child('active').isBoolean()"
+        ".validate": "newData.hasChildren(['id','name','type','ownerUid','plan','active']) && newData.child('id').val() === $organizationId && newData.child('name').isString() && newData.child('name').val().length >= 2 && (newData.child('type').val() === 'company' || newData.child('type').val() === 'school' || newData.child('type').val() === 'association') && newData.child('ownerUid').isString() && (newData.child('plan').val() === 'free' || newData.child('plan').val() === 'pro' || newData.child('plan').val() === 'business' || newData.child('plan').val() === 'enterprise') && newData.child('active').isBoolean()"
       }
     },
 
