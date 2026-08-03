@@ -11,11 +11,9 @@
     let serverTimeOffset = 0;
     let timerInterval = null;
 
-    if (typeof database !== 'undefined') {
-        database.ref('.info/serverTimeOffset').on('value', snapshot => {
-            serverTimeOffset = Number(snapshot.val()) || 0;
-        });
-    }
+    database.ref('.info/serverTimeOffset').on('value', snapshot => {
+        serverTimeOffset = Number(snapshot.val()) || 0;
+    });
 
     const serverNow = () => Date.now() + serverTimeOffset;
 
@@ -42,23 +40,20 @@
         const target = document.querySelector('.player-question-number');
         if (!target) return;
 
-        let timer = document.getElementById('speedQuestionTimer');
-        if (!timer) {
-            timer = document.createElement('div');
-            timer.id = 'speedQuestionTimer';
-            timer.style.cssText = [
-                'margin: 10px auto 18px',
-                'width: fit-content',
-                'padding: 8px 14px',
-                'border-radius: 999px',
-                'font-weight: 700',
-                'font-size: 1rem',
-                'background: rgba(99,102,241,.18)',
-                'border: 1px solid rgba(129,140,248,.45)',
-                'color: #fff'
-            ].join(';');
-            target.insertAdjacentElement('afterend', timer);
-        }
+        const timer = document.createElement('div');
+        timer.id = 'speedQuestionTimer';
+        timer.style.cssText = [
+            'margin: 10px auto 18px',
+            'width: fit-content',
+            'padding: 8px 14px',
+            'border-radius: 999px',
+            'font-weight: 700',
+            'font-size: 1rem',
+            'background: rgba(99,102,241,.18)',
+            'border: 1px solid rgba(129,140,248,.45)',
+            'color: #fff'
+        ].join(';');
+        target.insertAdjacentElement('afterend', timer);
 
         const refresh = () => {
             const elapsed = Math.max(0, serverNow() - Number(question.startedAt));
@@ -78,7 +73,7 @@
     }
 
     function injectAwardedPoints(questionIndex) {
-        const player = window.playerSession?.participants?.[window.playerId];
+        const player = playerSession?.participants?.[playerId];
         const awarded = player?.answerPoints?.[questionIndex];
         if (awarded === undefined || awarded === null) return;
 
@@ -89,7 +84,7 @@
     }
 
     function stampQuestionStart(questionIndex, extraUpdates = {}) {
-        const code = window.currentSession?.code;
+        const code = currentSession?.code;
         if (!code || questionIndex < 0) return Promise.resolve();
 
         return database.ref(`sessions/${code}`).update({
@@ -100,20 +95,20 @@
     }
 
     window.startQuiz = function startQuizWithTimer() {
-        if (!window.currentSession?.questions?.length) {
-            window.showToast?.('Ajoutez au moins une question', 'error');
+        if (!currentSession?.questions?.length) {
+            showToast('Ajoutez au moins une question', 'error');
             return;
         }
 
         stampQuestionStart(0, {
             status: 'active',
             currentQuestion: 0
-        }).then(() => window.showToast?.('Quiz lancé !'));
+        }).then(() => showToast('Quiz lancé !'));
     };
 
     window.nextQuestion = function nextQuestionWithTimer() {
-        const nextIndex = Number(window.currentSession?.currentQuestion ?? -1) + 1;
-        if (nextIndex < (window.currentSession?.questions?.length || 0)) {
+        const nextIndex = Number(currentSession?.currentQuestion ?? -1) + 1;
+        if (nextIndex < (currentSession?.questions?.length || 0)) {
             stampQuestionStart(nextIndex, { currentQuestion: nextIndex });
         }
     };
@@ -122,7 +117,7 @@
     if (typeof originalRenderPlayerMCQ === 'function') {
         window.renderPlayerMCQ = function renderPlayerMCQWithTimer(question, index) {
             originalRenderPlayerMCQ(question, index);
-            const player = window.playerSession?.participants?.[window.playerId];
+            const player = playerSession?.participants?.[playerId];
             const hasAnswered = player?.answers?.[index] !== undefined;
             renderQuestionTimer(question, hasAnswered);
             injectAwardedPoints(index);
@@ -130,8 +125,8 @@
     }
 
     window.submitMCQAnswer = function submitMCQAnswerWithSpeed(questionIndex, answerIndex) {
-        const session = window.playerSession;
-        const id = window.playerId;
+        const session = playerSession;
+        const id = playerId;
         const question = session?.questions?.[questionIndex];
         if (!session || !id || !question) return;
 
@@ -164,9 +159,9 @@
         }, (error, committed) => {
             if (error) {
                 console.error('Erreur de notation rapide :', error);
-                window.showToast?.('La réponse n’a pas pu être enregistrée', 'error');
+                showToast('La réponse n’a pas pu être enregistrée', 'error');
             } else if (!committed) {
-                window.showToast?.('Réponse déjà enregistrée', 'error');
+                showToast('Réponse déjà enregistrée', 'error');
             }
         });
     };
