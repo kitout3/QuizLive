@@ -1,164 +1,121 @@
-// QuizLive - import direct de présentations PowerPoint (.pptx)
+// QuizLive - import fidèle de slides via PDF ou images
 (() => {
     'use strict';
 
-    const PPTX_CDN = 'https://cdn.jsdelivr.net/gh/meshesha/PPTXjs@master';
-    const assets = {
-        css: [
-            `${PPTX_CDN}/css/pptxjs.css`,
-            `${PPTX_CDN}/css/nv.d3.min.css`
-        ],
-        scripts: [
-            'https://cdn.jsdelivr.net/npm/jquery@1.11.3/dist/jquery.min.js',
-            `${PPTX_CDN}/js/jszip.min.js`,
-            'https://cdn.jsdelivr.net/gh/meshesha/filereader.js@master/filereader.js',
-            `${PPTX_CDN}/js/d3.min.js`,
-            `${PPTX_CDN}/js/nv.d3.min.js`,
-            `${PPTX_CDN}/js/pptxjs.js`,
-            `${PPTX_CDN}/js/divs2slides.js`,
-            'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
-        ]
-    };
+    const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+    const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+    let pdfjsPromise = null;
 
-    function loadStyle(url) {
-        if ([...document.styleSheets].some(sheet => sheet.href === url)) return;
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = url;
-        document.head.appendChild(link);
-    }
-
-    function loadScript(url) {
-        return new Promise((resolve, reject) => {
-            const existing = [...document.scripts].find(script => script.src === url);
-            if (existing) {
-                if (existing.dataset.loaded === 'true') resolve();
-                else {
-                    existing.addEventListener('load', resolve, { once: true });
-                    existing.addEventListener('error', () => reject(new Error(`Chargement impossible : ${url}`)), { once: true });
-                }
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = url;
-            script.crossOrigin = 'anonymous';
-            script.onload = () => {
-                script.dataset.loaded = 'true';
-                resolve();
-            };
-            script.onerror = () => reject(new Error(`Chargement impossible : ${url}`));
-            document.head.appendChild(script);
-        });
-    }
-
-    async function ensureDependencies() {
-        assets.css.forEach(loadStyle);
-        for (const url of assets.scripts) await loadScript(url);
-
-        if (!window.jQuery?.fn?.pptxToHtml) {
-            throw new Error('Le moteur de conversion PowerPoint ne s’est pas initialisé');
+    async function loadPdfJs() {
+        if (!pdfjsPromise) {
+            pdfjsPromise = import(PDFJS_URL).then(pdfjsLib => {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+                return pdfjsLib;
+            });
         }
+        return pdfjsPromise;
     }
 
     function prepareImportUI() {
         const input = document.getElementById('slidesFileInput');
         if (!input) return;
-        input.accept = 'image/*,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+        input.accept = 'image/*,.pdf,application/pdf';
+        input.multiple = true;
 
         const label = document.querySelector('label[for="slidesFileInput"]');
-        if (label) label.textContent = '📁 Sélectionner des images ou un PowerPoint';
+        if (label) label.textContent = '📁 Sélectionner un PDF ou des images';
+
+        const button = document.getElementById('importSlidesBtn');
+        if (button) button.textContent = 'Sélectionner le PDF ou les images';
 
         const modal = document.getElementById('importSlidesModal');
-        const instruction = modal?.querySelector('.import-instructions p');
+        const instruction = modal?.querySelector('.import-instructions');
         if (instruction) {
-            instruction.textContent = 'Importez directement un fichier PowerPoint .pptx ou plusieurs images. Chaque page sera ajoutée comme une slide indépendante.';
+            instruction.innerHTML = `
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    Pour conserver exactement la mise en page, les proportions et les polices de votre PowerPoint,
+                    exportez-le d'abord en PDF puis importez ce PDF ici. Chaque page sera convertie en image indépendante.
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">
+                    Dans PowerPoint : <strong>Fichier → Exporter → Créer un document PDF/XPS</strong><br>
+                    Les fichiers PNG et JPG restent également acceptés.<br>
+                    Le format .pptx direct n'est plus proposé car son rendu dans un navigateur peut déformer les slides.
+                </p>
+            `;
         }
     }
 
-    function waitForSlides(container, timeout = 45000) {
+    async function renderPdfToImages(file) {
+        const pdfjsLib = await loadPdfJs();
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+        const images = [];
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const baseViewport = page.getViewport({ scale: 1 });
+
+            // Haute définition, tout en limitant les dimensions pour éviter
+            // des images trop lourdes dans Firebase Realtime Database.
+            const targetWidth = Math.min(1920, Math.max(1280, baseViewport.width * 2));
+            const scale = targetWidth / baseViewport.width;
+            const viewport = page.getViewport({ scale });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.ceil(viewport.width);
+            canvas.height = Math.ceil(viewport.height);
+            const context = canvas.getContext('2d', { alpha: false });
+
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            await page.render({
+                canvasContext: context,
+                viewport,
+                background: '#ffffff'
+            }).promise;
+
+            // PNG conserve mieux les textes, traits et aplats que le JPEG.
+            images.push(canvas.toDataURL('image/png'));
+            page.cleanup();
+        }
+
+        await pdf.destroy();
+        return images;
+    }
+
+    function readImage(file) {
         return new Promise((resolve, reject) => {
-            const started = Date.now();
-            let stableCount = 0;
-            let previousCount = 0;
-
-            const interval = setInterval(() => {
-                const candidates = [...container.querySelectorAll('.slide, section, .pptx-slide')]
-                    .filter(el => el.offsetWidth > 200 && el.offsetHeight > 100);
-                const count = candidates.length;
-
-                if (count > 0 && count === previousCount) stableCount++;
-                else stableCount = 0;
-                previousCount = count;
-
-                if (stableCount >= 4) {
-                    clearInterval(interval);
-                    resolve(candidates);
-                } else if (Date.now() - started > timeout) {
-                    clearInterval(interval);
-                    reject(new Error('Le PowerPoint n’a pas pu être converti dans le délai prévu'));
-                }
-            }, 500);
+            const reader = new FileReader();
+            reader.onload = event => resolve(event.target.result);
+            reader.onerror = () => reject(new Error(`Lecture impossible : ${file.name}`));
+            reader.readAsDataURL(file);
         });
     }
 
-    async function renderPptxToImages(file) {
-        await ensureDependencies();
-
-        const host = document.createElement('div');
-        host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;background:#fff;z-index:-1;';
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.id = `pptxHiddenInput_${Date.now()}`;
-        const output = document.createElement('div');
-        output.id = `pptxHiddenOutput_${Date.now()}`;
-        host.append(input, output);
-        document.body.appendChild(host);
-
-        try {
-            window.jQuery(output).pptxToHtml({
-                fileInputId: input.id,
-                slidesScale: '100%',
-                slideMode: false,
-                keyBoardShortCut: false,
-                mediaProcess: false
-            });
-
-            const transfer = new DataTransfer();
-            transfer.items.add(file);
-            input.files = transfer.files;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-
-            const slideElements = await waitForSlides(output);
-            const images = [];
-
-            for (let index = 0; index < slideElements.length; index++) {
-                const canvas = await html2canvas(slideElements[index], {
-                    backgroundColor: '#ffffff',
-                    scale: 1.4,
-                    useCORS: true,
-                    logging: false
-                });
-                images.push(canvas.toDataURL('image/jpeg', 0.88));
-            }
-            return images;
-        } finally {
-            host.remove();
-        }
+    async function saveSlides(slides) {
+        if (!currentSession?.code) throw new Error('Session introuvable');
+        const questions = [...(currentSession.questions || []), ...slides];
+        await database.ref(`sessions/${currentSession.code}/questions`).set(questions);
     }
 
-    const originalHandleSlidesImport = window.handleSlidesImport;
-    window.handleSlidesImport = async function handleSlidesOrPptxImport(event) {
+    window.handleSlidesImport = async function handleFaithfulSlideImport(event) {
         const files = [...(event.target.files || [])];
         if (!files.length) return;
 
-        const pptxFiles = files.filter(file => file.name.toLowerCase().endsWith('.pptx'));
-        const otherFiles = files.filter(file => !file.name.toLowerCase().endsWith('.pptx'));
+        const pptxFile = files.find(file => file.name.toLowerCase().endsWith('.pptx'));
+        if (pptxFile) {
+            showToast('Pour un rendu identique, exportez le PowerPoint en PDF puis importez le PDF', 'error');
+            event.target.value = '';
+            return;
+        }
 
-        if (!pptxFiles.length) return originalHandleSlidesImport?.(event);
+        const pdfFiles = files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
 
-        if (pptxFiles.length > 1 || otherFiles.length) {
-            showToast('Importez un seul fichier PowerPoint à la fois', 'error');
+        if (pdfFiles.length > 1 || (pdfFiles.length && imageFiles.length)) {
+            showToast('Importez un seul PDF à la fois, ou uniquement plusieurs images', 'error');
             event.target.value = '';
             return;
         }
@@ -167,37 +124,51 @@
         const originalText = button?.textContent;
         if (button) {
             button.disabled = true;
-            button.textContent = '⏳ Conversion du PowerPoint...';
+            button.textContent = pdfFiles.length ? '⏳ Conversion du PDF...' : '⏳ Import des images...';
         }
 
         try {
-            const images = await renderPptxToImages(pptxFiles[0]);
-            if (!images.length) throw new Error('Aucune slide détectée');
-
+            let slides = [];
             const timestamp = Date.now();
-            const slides = images.map((imageData, index) => ({
-                type: 'slide',
-                name: `${pptxFiles[0].name.replace(/\.pptx$/i, '')} — Slide ${index + 1}`,
-                imageData,
-                createdAt: timestamp + index
-            }));
 
-            const questions = [...(currentSession?.questions || []), ...slides];
-            await database.ref(`sessions/${currentSession.code}/questions`).set(questions);
-            showToast(`${slides.length} slides PowerPoint importées`);
+            if (pdfFiles.length === 1) {
+                const pdfFile = pdfFiles[0];
+                const images = await renderPdfToImages(pdfFile);
+                const baseName = pdfFile.name.replace(/\.pdf$/i, '');
+                slides = images.map((imageData, index) => ({
+                    type: 'slide',
+                    name: `${baseName} — Slide ${index + 1}`,
+                    imageData,
+                    createdAt: timestamp + index
+                }));
+            } else if (imageFiles.length) {
+                const images = await Promise.all(imageFiles.map(readImage));
+                slides = images.map((imageData, index) => ({
+                    type: 'slide',
+                    name: imageFiles[index].name.replace(/\.[^/.]+$/, ''),
+                    imageData,
+                    createdAt: timestamp + index
+                }));
+            } else {
+                throw new Error('Format de fichier non pris en charge');
+            }
+
+            if (!slides.length) throw new Error('Aucune slide détectée');
+            await saveSlides(slides);
+            showToast(`${slides.length} slide${slides.length > 1 ? 's' : ''} importée${slides.length > 1 ? 's' : ''} fidèlement`);
             closeModals();
         } catch (error) {
-            console.error('Erreur import PowerPoint :', error);
-            showToast(`Import PowerPoint impossible : ${error.message}`, 'error');
+            console.error('Erreur import des slides :', error);
+            showToast(`Import impossible : ${error.message}`, 'error');
         } finally {
             event.target.value = '';
             if (button) {
                 button.disabled = false;
-                button.textContent = originalText || 'Sélectionner les fichiers';
+                button.textContent = originalText || 'Sélectionner le PDF ou les images';
             }
         }
     };
 
     prepareImportUI();
-    console.log('✅ Import PowerPoint activé');
+    console.log('✅ Import fidèle PDF/images activé');
 })();
