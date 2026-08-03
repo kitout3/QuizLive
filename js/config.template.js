@@ -17,3 +17,12 @@ const ADMIN_UID_CONFIG = "%%FIREBASE_ADMIN_UID%%";
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
+
+// Charger le module de timer après le script principal afin qu'il puisse
+// enrichir les fonctions existantes sans modifier toute l'application.
+window.addEventListener('DOMContentLoaded', () => {
+    const speedScoringScript = document.createElement('script');
+    speedScoringScript.src = 'js/speed-scoring.js?v=1';
+    speedScoringScript.defer = true;
+    document.body.appendChild(speedScoringScript);
+});
