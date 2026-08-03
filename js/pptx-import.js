@@ -2,19 +2,20 @@
 (() => {
     'use strict';
 
+    const PPTX_CDN = 'https://cdn.jsdelivr.net/gh/meshesha/PPTXjs@master';
     const assets = {
         css: [
-            'https://pptx.js.org/css/pptxjs.css',
-            'https://pptx.js.org/css/nv.d3.min.css'
+            `${PPTX_CDN}/css/pptxjs.css`,
+            `${PPTX_CDN}/css/nv.d3.min.css`
         ],
         scripts: [
-            'https://code.jquery.com/jquery-1.11.3.min.js',
-            'https://pptx.js.org/js/jszip.min.js',
-            'https://cdn.jsdelivr.net/gh/meshesha/FileReader.js@master/filereader.js',
-            'https://pptx.js.org/js/d3.min.js',
-            'https://pptx.js.org/js/nv.d3.min.js',
-            'https://pptx.js.org/js/pptxjs.js',
-            'https://pptx.js.org/js/divs2slides.js',
+            'https://cdn.jsdelivr.net/npm/jquery@1.11.3/dist/jquery.min.js',
+            `${PPTX_CDN}/js/jszip.min.js`,
+            'https://cdn.jsdelivr.net/gh/meshesha/filereader.js@master/filereader.js',
+            `${PPTX_CDN}/js/d3.min.js`,
+            `${PPTX_CDN}/js/nv.d3.min.js`,
+            `${PPTX_CDN}/js/pptxjs.js`,
+            `${PPTX_CDN}/js/divs2slides.js`,
             'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
         ]
     };
@@ -29,13 +30,23 @@
 
     function loadScript(url) {
         return new Promise((resolve, reject) => {
-            if ([...document.scripts].some(script => script.src === url)) {
-                resolve();
+            const existing = [...document.scripts].find(script => script.src === url);
+            if (existing) {
+                if (existing.dataset.loaded === 'true') resolve();
+                else {
+                    existing.addEventListener('load', resolve, { once: true });
+                    existing.addEventListener('error', () => reject(new Error(`Chargement impossible : ${url}`)), { once: true });
+                }
                 return;
             }
+
             const script = document.createElement('script');
             script.src = url;
-            script.onload = resolve;
+            script.crossOrigin = 'anonymous';
+            script.onload = () => {
+                script.dataset.loaded = 'true';
+                resolve();
+            };
             script.onerror = () => reject(new Error(`Chargement impossible : ${url}`));
             document.head.appendChild(script);
         });
@@ -44,6 +55,10 @@
     async function ensureDependencies() {
         assets.css.forEach(loadStyle);
         for (const url of assets.scripts) await loadScript(url);
+
+        if (!window.jQuery?.fn?.pptxToHtml) {
+            throw new Error('Le moteur de conversion PowerPoint ne s’est pas initialisé');
+        }
     }
 
     function prepareImportUI() {
@@ -61,7 +76,7 @@
         }
     }
 
-    function waitForSlides(container, timeout = 30000) {
+    function waitForSlides(container, timeout = 45000) {
         return new Promise((resolve, reject) => {
             const started = Date.now();
             let stableCount = 0;
@@ -140,9 +155,7 @@
         const pptxFiles = files.filter(file => file.name.toLowerCase().endsWith('.pptx'));
         const otherFiles = files.filter(file => !file.name.toLowerCase().endsWith('.pptx'));
 
-        if (!pptxFiles.length) {
-            return originalHandleSlidesImport?.(event);
-        }
+        if (!pptxFiles.length) return originalHandleSlidesImport?.(event);
 
         if (pptxFiles.length > 1 || otherFiles.length) {
             showToast('Importez un seul fichier PowerPoint à la fois', 'error');
