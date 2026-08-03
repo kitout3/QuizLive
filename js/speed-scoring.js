@@ -3,7 +3,7 @@
 (() => {
     'use strict';
 
-    const QUESTION_DURATION_SECONDS = 30;
+    const QUESTION_DURATION_SECONDS = 20;
     const MAX_CORRECT_POINTS = 100;
     const MIN_CORRECT_POINTS = 0;
     const POINTS_LOST_PER_SECOND = 5;
@@ -78,8 +78,8 @@
         if (awarded === undefined || awarded === null) return;
 
         const feedback = document.querySelector('.feedback-message');
-        if (feedback) {
-            feedback.textContent = `Bonne réponse ! +${Number(awarded)} point${Number(awarded) > 1 ? 's' : ''}`;
+        if (feedback && Number(awarded) > 0) {
+            feedback.textContent = `Bonne réponse ! +${Number(awarded)} points`;
         }
     }
 
@@ -130,40 +130,52 @@
         const question = session?.questions?.[questionIndex];
         if (!session || !id || !question) return;
 
-        const participantRef = database.ref(`sessions/${session.code}/participants/${id}`);
+        const participantPath = `sessions/${session.code}/participants/${id}`;
+        const answerRef = database.ref(`${participantPath}/answers/${questionIndex}`);
         const answeredAt = serverNow();
         const isCorrect = Number(question.correct) === Number(answerIndex);
         const awardedPoints = isCorrect
             ? calculateSpeedPoints(Number(question.startedAt), answeredAt)
             : 0;
 
-        participantRef.transaction(participant => {
-            if (!participant) return participant;
-            participant.answers = participant.answers || {};
-
-            // Une seule validation par joueur et par question.
-            if (participant.answers[questionIndex] !== undefined) return;
-
-            participant.answerTimes = participant.answerTimes || {};
-            participant.answerPoints = participant.answerPoints || {};
-            participant.answers[questionIndex] = Number(answerIndex);
-            participant.answerTimes[questionIndex] = {
-                answeredAt,
-                elapsedMs: question.startedAt
-                    ? Math.max(0, answeredAt - Number(question.startedAt))
-                    : null
-            };
-            participant.answerPoints[questionIndex] = awardedPoints;
-            participant.score = (Number(participant.score) || 0) + awardedPoints;
-            return participant;
-        }, (error, committed) => {
+        // Réserver d'abord uniquement cette réponse. Cela évite la transaction
+        // sur l'objet participant complet qui échouait à partir de la 2e question.
+        answerRef.transaction(currentAnswer => {
+            if (currentAnswer !== null) return;
+            return Number(answerIndex);
+        }, async (error, committed) => {
             if (error) {
-                console.error('Erreur de notation rapide :', error);
+                console.error('Erreur enregistrement réponse :', error);
                 showToast('La réponse n’a pas pu être enregistrée', 'error');
-            } else if (!committed) {
-                showToast('Réponse déjà enregistrée', 'error');
+                return;
             }
-        });
+
+            if (!committed) {
+                showToast('Réponse déjà enregistrée', 'error');
+                return;
+            }
+
+            try {
+                const updates = {};
+                updates[`${participantPath}/answerTimes/${questionIndex}`] = {
+                    answeredAt,
+                    elapsedMs: question.startedAt
+                        ? Math.max(0, answeredAt - Number(question.startedAt))
+                        : null
+                };
+                updates[`${participantPath}/answerPoints/${questionIndex}`] = awardedPoints;
+                await database.ref().update(updates);
+
+                if (awardedPoints > 0) {
+                    await database.ref(`${participantPath}/score`).transaction(score =>
+                        (Number(score) || 0) + awardedPoints
+                    );
+                }
+            } catch (writeError) {
+                console.error('Erreur mise à jour du score :', writeError);
+                showToast('Réponse enregistrée, mais le score n’a pas pu être mis à jour', 'error');
+            }
+        }, false);
     };
 
     console.log('✅ Timer et notation par rapidité activés');
