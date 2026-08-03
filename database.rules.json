@@ -59,6 +59,16 @@
       }
     },
 
+    "sessionPseudos": {
+      "$code": {
+        ".read": "auth != null",
+        "$pseudoKey": {
+          ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
+          ".validate": "!newData.exists() || (newData.hasChildren(['uid','name','normalized','reservedAt']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30 && newData.child('normalized').isString() && newData.child('reservedAt').isNumber())"
+        }
+      }
+    },
+
     "sessions": {
       "$code": {
         ".read": "auth != null",
@@ -72,6 +82,7 @@
           "$participantId": {
             ".read": "auth != null",
             ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['id','name','joinedAt']) && newData.child('id').val() === $participantId && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30)",
 
             "answers": {
               "$questionIndex": {
