@@ -11,6 +11,30 @@
       }
     },
 
+    "organizations": {
+      "$organizationId": {
+        ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).exists())",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid)",
+        ".validate": "newData.hasChildren(['id','name','type','ownerUid','plan','active']) && newData.child('id').val() === $organizationId && newData.child('name').isString() && newData.child('name').val().length >= 2 && newData.child('type').val() in ['company','school','association'] && newData.child('ownerUid').isString() && newData.child('plan').val() in ['free','pro','business','enterprise'] && newData.child('active').isBoolean()"
+      }
+    },
+
+    "organizationMembers": {
+      "$organizationId": {
+        ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
+        "$uid": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid)"
+        }
+      }
+    },
+
+    "userOrganizations": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
     "organizerSessions": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -18,6 +42,20 @@
         "$code": {
           ".validate": "newData.hasChildren(['code','name','createdAt','status']) && newData.child('code').val() === $code"
         }
+      }
+    },
+
+    "questionBanks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "subscriptions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
       }
     },
 
