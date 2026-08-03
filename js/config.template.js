@@ -17,8 +17,6 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 // Compatibilité avec l'initialisation historique d'app.js qui lit localStorage.
-// La donnée de l'onglet courant reste prioritaire afin d'éviter de recréer
-// un participant après la redirection vers play.html.
 const tabQuizSession = sessionStorage.getItem('quizSession');
 if (tabQuizSession) localStorage.setItem('quizSession', tabQuizSession);
 
@@ -47,7 +45,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (page === 'admin') {
             await loadQuizModule('js/participant-guard.js?v=5');
-            await loadQuizModule('js/pptx-import.js?v=5');
+            await loadQuizModule('js/pptx-import.js?v=6');
         }
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
