@@ -3,13 +3,10 @@
     'use strict';
 
     async function createFreshPlayerIdentity() {
-        // SESSION utilise sessionStorage : chaque onglet peut conserver son propre joueur.
         await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
         const currentUser = firebase.auth().currentUser;
-        if (currentUser) {
-            await firebase.auth().signOut();
-        }
+        if (currentUser) await firebase.auth().signOut();
 
         const credential = await firebase.auth().signInAnonymously();
         return credential.user;
@@ -19,7 +16,7 @@
         return String(value || '')
             .trim()
             .substring(0, 30)
-            .replace(/[<>\"\'&]/g, '');
+            .replace(/[<>\"'&]/g, '');
     }
 
     async function registerPlayer(sessionCode, playerName) {
@@ -33,15 +30,18 @@
             score: 0
         });
 
-        // sessionStorage évite également que deux onglets partagent le même joueur.
         const sessionData = {
             code: sessionCode,
             isAdmin: false,
             odparticipantId: participantId,
             name: playerName
         };
-        sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
-        localStorage.removeItem('quizSession');
+
+        // sessionStorage isole les onglets. localStorage reste renseigné pour
+        // compatibilité avec initPlayer() dans app.js après la redirection.
+        const serialized = JSON.stringify(sessionData);
+        sessionStorage.setItem('quizSession', serialized);
+        localStorage.setItem('quizSession', serialized);
 
         return { participantId, sessionData };
     }
@@ -82,8 +82,7 @@
         }
 
         try {
-            const { sessionData } = await registerPlayer(sessionCode, playerName);
-            sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
+            await registerPlayer(sessionCode, playerName);
             window.location.href = `play.html?code=${sessionCode}`;
         } catch (error) {
             console.error('Erreur inscription participant :', error);
