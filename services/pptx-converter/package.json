@@ -1,0 +1,20 @@
+{
+  "name": "quizlive-pptx-converter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.16.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.4.0",
+    "multer": "^2.0.2",
+    "uuid": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
