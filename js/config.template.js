@@ -16,13 +16,40 @@ const ADMIN_UID_CONFIG = "%%FIREBASE_ADMIN_UID%%";
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-window.addEventListener('DOMContentLoaded', () => {
-    const authScript = document.createElement('script');
-    authScript.src = 'js/player-session-auth.js?v=3';
-    authScript.onload = () => {
-        const speedScoringScript = document.createElement('script');
-        speedScoringScript.src = 'js/speed-scoring.js?v=3';
-        document.body.appendChild(speedScoringScript);
-    };
-    document.body.appendChild(authScript);
+// Compatibilité avec l'initialisation historique d'app.js qui lit localStorage.
+// La donnée de l'onglet courant reste prioritaire afin d'éviter de recréer
+// un participant après la redirection vers play.html.
+const tabQuizSession = sessionStorage.getItem('quizSession');
+if (tabQuizSession) localStorage.setItem('quizSession', tabQuizSession);
+
+function loadQuizModule(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.body.appendChild(script);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    const page = document.body?.dataset?.page || '';
+
+    try {
+        if (page === 'player' || document.body.classList.contains('home-page')) {
+            await loadQuizModule('js/player-session-auth.js?v=5');
+            await loadQuizModule('js/participant-guard.js?v=5');
+        }
+
+        if (page === 'player' || page === 'admin') {
+            await loadQuizModule('js/speed-scoring.js?v=5');
+        }
+
+        if (page === 'admin') {
+            await loadQuizModule('js/participant-guard.js?v=5');
+            await loadQuizModule('js/pptx-import.js?v=5');
+        }
+    } catch (error) {
+        console.error('Erreur de chargement des modules QuizLive :', error);
+    }
 });
