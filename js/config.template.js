@@ -35,17 +35,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     try {
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=7');
-            await loadQuizModule('js/participant-guard.js?v=7');
+            await loadQuizModule('js/player-session-auth.js?v=8');
+            await loadQuizModule('js/participant-guard.js?v=8');
         }
 
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=7');
+            await loadQuizModule('js/speed-scoring.js?v=8');
         }
 
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=7');
-            await loadQuizModule('js/pptx-import.js?v=7');
+            await loadQuizModule('js/participant-guard.js?v=8');
+            await loadQuizModule('js/pptx-import.js?v=8');
         }
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
