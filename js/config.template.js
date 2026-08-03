@@ -1,7 +1,7 @@
 // Firebase Configuration - Generated at build time
 const firebaseConfig = {
     apiKey: "%%FIREBASE_API_KEY%%",
-    authDomain: "%%FIREBASE_AUTH_DOMAIN%%",
+    authDomain: "quizlive-app.firebaseapp.com",
     databaseURL: "%%FIREBASE_DATABASE_URL%%",
     projectId: "%%FIREBASE_PROJECT_ID%%",
     storageBucket: "%%FIREBASE_STORAGE_BUCKET%%",
@@ -31,24 +31,24 @@ function loadQuizModule(src) {
 window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
     try {
-        await loadQuizModule('js/organizer-auth.js?v=15');
-        await loadQuizModule('js/google-auth-fix.js?v=15');
-        await loadQuizModule('js/platform-features.js?v=15');
+        await loadQuizModule('js/organizer-auth.js?v=16');
+        await loadQuizModule('js/google-auth-fix.js?v=16');
+        await loadQuizModule('js/platform-features.js?v=16');
 
         if (document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/home-role-flow.js?v=15');
+            await loadQuizModule('js/home-role-flow.js?v=16');
         }
 
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=15');
-            await loadQuizModule('js/participant-guard.js?v=15');
+            await loadQuizModule('js/player-session-auth.js?v=16');
+            await loadQuizModule('js/participant-guard.js?v=16');
         }
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=15');
+            await loadQuizModule('js/speed-scoring.js?v=16');
         }
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=15');
-            await loadQuizModule('js/pptx-import.js?v=15');
+            await loadQuizModule('js/participant-guard.js?v=16');
+            await loadQuizModule('js/pptx-import.js?v=16');
         }
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
