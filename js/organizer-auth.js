@@ -3,36 +3,36 @@
   'use strict';
 
   const cleanName = value => String(value || '').trim().slice(0, 80).replace(/[<>"'&]/g, '');
-  const normalizeEmail = value => String(value || '').trim().toLowerCase();
+  const cleanEmail = value => String(value || '').trim().toLowerCase();
 
   function authMessage(error) {
-    const messages = {
+    const map = {
       'auth/email-already-in-use': 'Cette adresse email est déjà utilisée.',
       'auth/invalid-email': 'Adresse email invalide.',
       'auth/weak-password': 'Le mot de passe doit contenir au moins 8 caractères.',
       'auth/user-not-found': 'Aucun compte ne correspond à cette adresse email.',
-      'auth/wrong-password': 'Email ou mot de passe incorrect.',
+      'auth/wrong-password': 'Mot de passe incorrect.',
       'auth/invalid-credential': 'Email ou mot de passe incorrect.',
-      'auth/unauthorized-domain': 'Le domaine GitHub Pages doit être autorisé dans Firebase Authentication.',
-      'auth/operation-not-allowed': 'La connexion Google doit être activée dans Firebase Authentication.'
+      'auth/unauthorized-domain': 'Le domaine GitHub Pages n’est pas autorisé dans Firebase.',
+      'auth/operation-not-allowed': 'La connexion Google n’est pas activée dans Firebase.'
     };
-    return messages[error?.code] || error?.message || 'Authentification impossible.';
+    return map[error?.code] || error?.message || 'Authentification impossible.';
   }
 
   async function saveOrganizerProfile(user, displayName) {
     if (!user || user.isAnonymous) throw new Error('Compte organisateur invalide.');
     const ref = database.ref(`organizers/${user.uid}`);
     const snap = await ref.once('value');
-    const current = snap.val() || {};
+    const existing = snap.val() || {};
     await ref.update({
       uid: user.uid,
-      email: user.email || current.email || '',
-      displayName: cleanName(displayName || current.displayName || user.displayName || user.email?.split('@')[0]),
+      email: user.email || existing.email || '',
+      displayName: cleanName(displayName || user.displayName || existing.displayName || user.email?.split('@')[0]),
       role: 'organizer',
-      active: current.active !== false,
-      provider: user.providerData?.[0]?.providerId || current.provider || 'password',
-      plan: current.plan || 'free',
-      createdAt: current.createdAt || firebase.database.ServerValue.TIMESTAMP,
+      active: existing.active !== false,
+      provider: user.providerData?.[0]?.providerId || existing.provider || 'password',
+      plan: existing.plan || 'free',
+      createdAt: existing.createdAt || firebase.database.ServerValue.TIMESTAMP,
       updatedAt: firebase.database.ServerValue.TIMESTAMP
     });
     localStorage.setItem('organizerUid', user.uid);
@@ -50,82 +50,120 @@
   }
 
   async function signInWithGoogle() {
-    sessionStorage.setItem('quizliveGoogleReturn', '1');
+    sessionStorage.setItem('quizliveGoogleRedirect', '1');
     await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     return firebase.auth().signInWithRedirect(provider);
   }
 
-  async function completeGoogleRedirect() {
+  async function finishGoogleRedirect() {
     try {
       const result = await firebase.auth().getRedirectResult();
       const user = result?.user;
       if (!user) return;
+      sessionStorage.removeItem('quizliveGoogleRedirect');
       await saveOrganizerProfile(user, user.displayName);
-      sessionStorage.removeItem('quizliveGoogleReturn');
+      localStorage.setItem('quizliveHomeRole', 'organizer');
       if (typeof showToast === 'function') showToast('Connexion Google réussie');
     } catch (error) {
-      sessionStorage.removeItem('quizliveGoogleReturn');
-      console.error('Retour Google :', error);
-      sessionStorage.setItem('quizliveAuthError', authMessage(error));
+      sessionStorage.removeItem('quizliveGoogleRedirect');
+      console.error('Retour Google:', error);
+      if (typeof showToast === 'function') showToast(authMessage(error), 'error');
     }
   }
 
   async function sendPasswordReset(email) {
-    const normalized = normalizeEmail(email);
-    if (!normalized) throw new Error('Renseignez votre adresse email.');
-    await firebase.auth().sendPasswordResetEmail(normalized, {
+    const value = cleanEmail(email);
+    if (!value) throw new Error('Renseignez votre adresse email.');
+    await firebase.auth().sendPasswordResetEmail(value, {
       url: `${location.origin}${location.pathname}`,
       handleCodeInApp: false
     });
+  }
+
+  async function createOrganizer(email, password, name) {
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const credential = await firebase.auth().createUserWithEmailAndPassword(cleanEmail(email), password);
+    await credential.user.updateProfile({ displayName: cleanName(name) });
+    await saveOrganizerProfile(credential.user, name);
+    return credential.user;
+  }
+
+  async function loginOrganizer(email, password) {
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const credential = await firebase.auth().signInWithEmailAndPassword(cleanEmail(email), password);
+    if (!(await ensureOrganizer(credential.user))) throw new Error('Compte organisateur inactif.');
+    return credential.user;
   }
 
   function installOwnedSessionCreation() {
     window.createQuizAfterLogin = async event => {
       event?.preventDefault?.();
       const user = firebase.auth().currentUser;
-      if (!user || !(await ensureOrganizer(user))) throw new Error('Connexion organisateur requise.');
-      const sessionName = cleanName(document.getElementById('sessionName')?.value);
-      const adminName = cleanName(document.getElementById('adminName')?.value || user.displayName || user.email);
-      if (!sessionName || !adminName) {
-        if (typeof showToast === 'function') showToast('Renseignez le nom de la session et de l’organisateur', 'error');
+      if (!user || !(await ensureOrganizer(user))) {
+        if (typeof showToast === 'function') showToast('Connectez-vous avec un compte organisateur', 'error');
+        return;
+      }
+      const name = cleanName(document.getElementById('sessionName')?.value);
+      const admin = cleanName(document.getElementById('adminName')?.value || user.displayName || user.email);
+      if (!name || !admin) {
+        if (typeof showToast === 'function') showToast('Renseignez le nom du quiz et de l’organisateur', 'error');
         return;
       }
       const profile = (await database.ref(`organizers/${user.uid}`).once('value')).val() || {};
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let code = '';
-      for (let attempt = 0; attempt < 30; attempt += 1) {
+      for (let attempt = 0; attempt < 30; attempt++) {
         code = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
         if (!(await database.ref(`sessions/${code}`).once('value')).exists()) break;
       }
       const createdAt = Date.now();
       const session = {
-        code, name: sessionName, admin: adminName, ownerUid: user.uid,
-        organizerEmail: user.email || '', organizationId: profile.defaultOrganizationId || '',
-        plan: profile.plan || 'free', createdAt, status: 'waiting', currentQuestion: -1,
-        questions: [], slides: [], participants: {}, presenterMode: false,
+        code, name, admin, ownerUid: user.uid,
+        organizerEmail: user.email || '',
+        organizationId: profile.defaultOrganizationId || '',
+        plan: profile.plan || 'free',
+        createdAt, status: 'waiting', currentQuestion: -1,
+        questions: [], participants: {}, presenterMode: false,
         settings: { timerEnabled: true, musicEnabled: false, animationsEnabled: true }
       };
       const updates = {};
       updates[`sessions/${code}`] = session;
-      updates[`organizerSessions/${user.uid}/${code}`] = {
-        code, name: sessionName, createdAt, status: 'waiting', organizationId: session.organizationId
-      };
+      updates[`organizerSessions/${user.uid}/${code}`] = { code, name, createdAt, status: 'waiting', organizationId: session.organizationId };
       await database.ref().update(updates);
-      localStorage.setItem('quizSession', JSON.stringify({ code, isAdmin: true, name: adminName, ownerUid: user.uid }));
+      const local = { code, isAdmin: true, name: admin, ownerUid: user.uid };
+      localStorage.setItem('quizSession', JSON.stringify(local));
+      sessionStorage.setItem('quizSession', JSON.stringify(local));
       location.href = `admin.html?code=${code}`;
     };
   }
 
+  function protectAdminSession() {
+    if (document.body?.dataset?.page !== 'admin') return;
+    const code = new URLSearchParams(location.search).get('code');
+    firebase.auth().onAuthStateChanged(async user => {
+      if (!user || user.isAnonymous || !code) return;
+      const snap = await database.ref(`sessions/${code}`).once('value');
+      const session = snap.val();
+      if (session?.ownerUid && session.ownerUid !== user.uid) {
+        alert('Cette session appartient à un autre organisateur.');
+        location.href = 'index.html';
+      }
+    });
+  }
+
   window.QuizOrganizer = {
-    ensureOrganizer,
+    authMessage,
     saveOrganizerProfile,
+    ensureOrganizer,
     signInWithGoogle,
     sendPasswordReset,
-    authMessage
+    createOrganizer,
+    loginOrganizer
   };
 
+  finishGoogleRedirect();
   installOwnedSessionCreation();
-  completeGoogleRedirect();
+  protectAdminSession();
 })();
