@@ -1,201 +1,105 @@
-// QuizLive - flux unifiés et correctifs de stabilité
+// QuizLive - flux unifiés de stabilité
 (() => {
   'use strict';
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const toast = (m,t='success') => typeof window.showToast === 'function' ? window.showToast(m,t) : alert(m);
+  const codeFromUrl = () => new URLSearchParams(location.search).get('code');
+  const normalizePseudo = v => String(v||'').trim().toLocaleLowerCase('fr-FR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 _-]/g,'').replace(/\s+/g,' ').slice(0,30);
 
-  const normalizePseudo = value => String(value || '')
-    .trim().toLocaleLowerCase('fr-FR').normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 _-]/g, '')
-    .replace(/\s+/g, ' ').slice(0, 30);
-
-  function toast(message, type = 'success') {
-    if (typeof window.showToast === 'function') window.showToast(message, type);
-    else alert(message);
-  }
-
-  // ---------- GOOGLE : un seul flux, uniquement par redirection ----------
-  async function googleRedirect(event) {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    event?.stopImmediatePropagation?.();
+  // Google : capture prioritaire et redirection uniquement.
+  async function googleRedirect(e) {
+    e?.preventDefault?.(); e?.stopPropagation?.(); e?.stopImmediatePropagation?.();
     try {
-      sessionStorage.setItem('quizliveGoogleReturn', '1');
+      sessionStorage.setItem('quizliveGoogleReturn','1');
       await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
       const provider = new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+      provider.setCustomParameters({prompt:'select_account'});
       await firebase.auth().signInWithRedirect(provider);
-    } catch (error) {
-      console.error('Google redirect error', error);
-      toast(error?.message || 'Connexion Google impossible', 'error');
-    }
+    } catch (err) { console.error(err); toast(err.message || 'Connexion Google impossible','error'); }
   }
-
-  document.addEventListener('click', event => {
-    const button = event.target.closest('#roleGoogleBtn, #orgGoogleBtn, [data-google-auth]');
-    if (button) googleRedirect(event);
+  document.addEventListener('click', e => {
+    if (e.target.closest('#roleGoogleBtn,#orgGoogleBtn,[data-google-auth]')) googleRedirect(e);
   }, true);
-
   firebase.auth().getRedirectResult().then(async result => {
-    const user = result?.user || firebase.auth().currentUser;
-    if (!sessionStorage.getItem('quizliveGoogleReturn') || !user || user.isAnonymous) return;
+    const user = result?.user;
+    if (!user) return;
     sessionStorage.removeItem('quizliveGoogleReturn');
-    if (window.QuizOrganizer?.saveOrganizerProfile) {
-      await window.QuizOrganizer.saveOrganizerProfile(user, user.displayName);
-    }
-    localStorage.setItem('organizerUid', user.uid);
+    if (window.QuizOrganizer?.saveOrganizerProfile) await window.QuizOrganizer.saveOrganizerProfile(user,user.displayName);
+    localStorage.setItem('organizerUid',user.uid);
     toast('Connexion Google réussie');
-    if (location.pathname.endsWith('/index.html') || location.pathname.endsWith('/QuizLive/')) location.reload();
-  }).catch(error => {
-    sessionStorage.removeItem('quizliveGoogleReturn');
-    console.error('Google redirect result error', error);
-    toast(error?.message || 'Connexion Google impossible', 'error');
-  });
+    location.replace('index.html');
+  }).catch(err => { console.error(err); toast(err.message || 'Connexion Google impossible','error'); });
+  setTimeout(() => { if (window.QuizOrganizer) window.QuizOrganizer.signInWithGoogle = googleRedirect; }, 0);
 
-  // Neutralise les anciennes API popup encore appelées par les modules historiques.
-  if (window.QuizOrganizer) {
-    window.QuizOrganizer.signInWithGoogle = () => googleRedirect();
-  }
-
-  // ---------- PARTICIPANT : authentification, session, pseudo atomique ----------
-  async function joinParticipant(event) {
-    event?.preventDefault?.();
-    event?.stopImmediatePropagation?.();
-    const code = String(document.getElementById('sessionCode')?.value || '').trim().toUpperCase();
-    const name = String(document.getElementById('playerName')?.value || '').trim().slice(0, 30).replace(/[<>"'&]/g, '');
-    if (!/^[A-Z0-9]{6}$/.test(code) || !name) {
-      toast('Code à 6 caractères et pseudo requis', 'error');
-      return false;
-    }
-    const submit = event?.submitter || document.querySelector('#joinModal button[type="submit"]');
-    if (submit?.disabled) return false;
-    if (submit) { submit.disabled = true; submit.dataset.oldText = submit.textContent; submit.textContent = 'Connexion…'; }
-    let pseudoRef;
+  // Participant : un seul flux avec réservation atomique du pseudo.
+  async function joinParticipant(e) {
+    e?.preventDefault?.(); e?.stopPropagation?.(); e?.stopImmediatePropagation?.();
+    const code = String(document.getElementById('sessionCode')?.value||'').trim().toUpperCase();
+    const name = String(document.getElementById('playerName')?.value||'').trim().slice(0,30).replace(/[<>"'&]/g,'');
+    if (!/^[A-Z0-9]{6}$/.test(code) || !name) { toast('Code à 6 caractères et pseudo requis','error'); return false; }
+    const btn = e?.submitter || document.querySelector('#joinModal button[type="submit"]');
+    if (btn?.disabled) return false;
+    if (btn) { btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='Connexion…'; }
     try {
       if (firebase.auth().currentUser && !firebase.auth().currentUser.isAnonymous) await firebase.auth().signOut();
       await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
       let user = firebase.auth().currentUser;
-      if (!user?.isAnonymous) user = (await firebase.auth().signInAnonymously()).user;
-
-      const sessionSnap = await database.ref(`sessions/${code}`).once('value');
-      if (!sessionSnap.exists()) throw new Error('Session introuvable');
-
-      const key = normalizePseudo(name);
-      if (!key) throw new Error('Pseudo invalide');
-      pseudoRef = database.ref(`sessionPseudos/${code}/${key}`);
-      const tx = await pseudoRef.transaction(current => current || {
-        uid: user.uid, name, createdAt: firebase.database.ServerValue.TIMESTAMP
-      });
-      if (!tx.committed || tx.snapshot.val()?.uid !== user.uid) {
-        throw new Error('Ce pseudo est déjà utilisé dans cette partie');
-      }
-
-      const participant = { id: user.uid, name, joinedAt: Date.now(), score: 0 };
-      await database.ref(`sessions/${code}/participants/${user.uid}`).set(participant);
-      const local = { code, isAdmin: false, participantId: user.uid, odparticipantId: user.uid, name };
-      sessionStorage.setItem('quizSession', JSON.stringify(local));
-      localStorage.setItem('quizSession', JSON.stringify(local));
-      location.href = `play.html?code=${encodeURIComponent(code)}`;
-      return false;
-    } catch (error) {
-      console.error('Participant join error', error);
-      if (pseudoRef && /permission|session introuvable/i.test(String(error?.message))) {
-        // ne supprime pas une réservation appartenant à un tiers
-      }
-      toast(error?.message || 'Connexion participant impossible', 'error');
-      return false;
-    } finally {
-      if (submit) { submit.disabled = false; submit.textContent = submit.dataset.oldText || 'Rejoindre'; }
-    }
+      if (!user?.isAnonymous) user=(await firebase.auth().signInAnonymously()).user;
+      const session = await database.ref(`sessions/${code}`).once('value');
+      if (!session.exists()) throw new Error('Session introuvable');
+      const key=normalizePseudo(name); if(!key) throw new Error('Pseudo invalide');
+      const ref=database.ref(`sessionPseudos/${code}/${key}`);
+      const tx=await ref.transaction(cur => cur || {uid:user.uid,name,createdAt:Date.now()});
+      if(!tx.committed || tx.snapshot.val()?.uid!==user.uid) throw new Error('Ce pseudo est déjà utilisé dans cette partie');
+      await database.ref(`sessions/${code}/participants/${user.uid}`).set({id:user.uid,name,joinedAt:Date.now(),score:0});
+      const local={code,isAdmin:false,participantId:user.uid,odparticipantId:user.uid,name};
+      sessionStorage.setItem('quizSession',JSON.stringify(local)); localStorage.setItem('quizSession',JSON.stringify(local));
+      location.href=`play.html?code=${encodeURIComponent(code)}`;
+    } catch(err) { console.error(err); toast(err.message || 'Connexion participant impossible','error'); }
+    finally { if(btn){btn.disabled=false;btn.textContent=btn.dataset.label||'Rejoindre';} }
+    return false;
   }
+  window.joinQuiz=joinParticipant;
+  document.addEventListener('submit',e=>{ if(e.target.closest('#joinModal')) joinParticipant(e); },true);
 
-  window.joinQuiz = joinParticipant;
-  document.addEventListener('submit', event => {
-    const form = event.target;
-    if (form?.closest?.('#joinModal') || form?.querySelector?.('#sessionCode')) joinParticipant(event);
-  }, true);
-
-  // ---------- SAUVEGARDE : rangement par organisateur ----------
-  window.saveSession = async function saveSessionUnified() {
-    try {
-      const user = firebase.auth().currentUser;
-      if (!user || user.isAnonymous) throw new Error('Connexion organisateur requise');
-      const code = new URLSearchParams(location.search).get('code') || window.currentSession?.code;
-      if (!code) throw new Error('Session introuvable');
-      const snap = await database.ref(`sessions/${code}`).once('value');
-      const session = snap.val();
-      if (!session || session.ownerUid !== user.uid) throw new Error('Vous ne pouvez sauvegarder que vos propres quiz');
-      const saveId = `${Date.now()}-${code}`;
-      const payload = {
-        id: saveId,
-        sourceCode: code,
-        name: session.name || `Quiz ${code}`,
-        questions: session.questions || [],
-        slides: session.slides || [],
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-      await database.ref(`savedSessions/${user.uid}/${saveId}`).set(payload);
-      toast('Quiz sauvegardé');
-      document.getElementById('saveSessionModal')?.classList.remove('active');
-    } catch (error) {
-      console.error('Save quiz error', error);
-      toast(`Erreur de sauvegarde : ${error?.message || 'inconnue'}`, 'error');
-    }
+  // Sauvegarde des quiz dans l’espace propre à l’organisateur.
+  window.saveSession=async function(){
+    try{
+      const user=firebase.auth().currentUser; if(!user||user.isAnonymous) throw new Error('Connexion organisateur requise');
+      const code=codeFromUrl(); if(!code) throw new Error('Session introuvable');
+      const snap=await database.ref(`sessions/${code}`).once('value'); const s=snap.val();
+      if(!s||s.ownerUid!==user.uid) throw new Error('Cette session ne vous appartient pas');
+      const id=`${Date.now()}-${code}`;
+      await database.ref(`savedSessions/${user.uid}/${id}`).set({id,sourceCode:code,name:s.name||`Quiz ${code}`,questions:s.questions||[],slides:s.slides||[],createdAt:Date.now(),updatedAt:Date.now()});
+      toast('Quiz sauvegardé'); document.getElementById('saveSessionModal')?.classList.remove('active');
+    }catch(err){console.error(err);toast(`Erreur de sauvegarde : ${err.message}`,'error');}
   };
 
-  // ---------- APERÇU ET ORDRE DES QUESTIONS/SLIDES ----------
-  function getItems() {
-    const session = window.currentSession;
-    if (!session) return [];
-    return Array.isArray(session.questions) ? session.questions : Object.values(session.questions || {});
+  async function loadItems(){
+    const code=codeFromUrl(); if(!code) return [];
+    const snap=await database.ref(`sessions/${code}/questions`).once('value');
+    const value=snap.val()||[]; return Array.isArray(value)?value:Object.keys(value).sort((a,b)=>Number(a)-Number(b)).map(k=>value[k]);
   }
-
-  function preview(index) {
-    const item = getItems()[index];
-    const display = document.getElementById('questionDisplay');
-    if (!item || !display) return;
-    if (item.type === 'slide' || item.imageData || item.imageUrl) {
-      const src = item.imageData || item.imageUrl || item.url;
-      display.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><img src="${src}" alt="Slide ${index + 1}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div>`;
-    } else {
-      const options = Array.isArray(item.options) ? item.options : Object.values(item.options || {});
-      display.innerHTML = `<div style="padding:28px;width:100%"><div style="color:var(--text-muted);margin-bottom:12px">Aperçu ${index + 1}</div><h2>${String(item.text || item.question || 'Question').replace(/[<>]/g,'')}</h2><div style="display:grid;gap:10px;margin-top:24px">${options.map((o,i)=>`<div style="padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px">${i+1}. ${String(o).replace(/[<>]/g,'')}</div>`).join('')}</div></div>`;
-    }
+  async function preview(index){
+    const item=(await loadItems())[index], display=document.getElementById('questionDisplay'); if(!item||!display)return;
+    const src=item.imageData||item.imageUrl||item.url;
+    if(item.type==='slide'||src){display.innerHTML=`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><img src="${esc(src)}" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px"></div>`;return;}
+    const opts=Array.isArray(item.options)?item.options:Object.values(item.options||{});
+    display.innerHTML=`<div style="padding:28px;width:100%"><small>Aperçu ${index+1}</small><h2>${esc(item.text||item.question||'Question')}</h2><div style="display:grid;gap:10px;margin-top:22px">${opts.map((o,i)=>`<div style="padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px">${i+1}. ${esc(o)}</div>`).join('')}</div></div>`;
   }
-
-  async function moveItem(from, delta) {
-    const items = getItems();
-    const to = from + delta;
-    if (to < 0 || to >= items.length) return;
-    [items[from], items[to]] = [items[to], items[from]];
-    const code = new URLSearchParams(location.search).get('code');
-    await database.ref(`sessions/${code}/questions`).set(items);
-    preview(to);
+  async function move(index,delta){
+    const items=await loadItems(),to=index+delta;if(to<0||to>=items.length)return;[items[index],items[to]]=[items[to],items[index]];
+    await database.ref(`sessions/${codeFromUrl()}/questions`).set(items); await preview(to);
   }
-
-  function enhanceList() {
-    const list = document.getElementById('questionList');
-    if (!list) return;
-    [...list.children].forEach((child, index) => {
-      if (child.dataset.previewEnhanced === '1') return;
-      child.dataset.previewEnhanced = '1';
-      child.style.cursor = 'pointer';
-      child.addEventListener('click', event => {
-        if (event.target.closest('button')) return;
-        preview(index);
-      });
-      const controls = document.createElement('span');
-      controls.style.cssText = 'display:inline-flex;gap:4px;margin-left:8px;float:right';
-      controls.innerHTML = `<button type="button" title="Monter" style="padding:2px 7px">↑</button><button type="button" title="Descendre" style="padding:2px 7px">↓</button>`;
-      controls.children[0].onclick = e => { e.stopPropagation(); moveItem(index, -1).catch(err => toast(err.message, 'error')); };
-      controls.children[1].onclick = e => { e.stopPropagation(); moveItem(index, 1).catch(err => toast(err.message, 'error')); };
-      child.appendChild(controls);
+  function enhance(){
+    const list=document.getElementById('questionList');if(!list)return;
+    [...list.children].forEach((el,i)=>{
+      if(el.dataset.previewEnhanced)return;el.dataset.previewEnhanced='1';el.style.cursor='pointer';
+      el.addEventListener('click',e=>{if(!e.target.closest('button'))preview(i)});
+      const c=document.createElement('span');c.style.cssText='float:right;display:inline-flex;gap:3px';c.innerHTML='<button type="button">↑</button><button type="button">↓</button>';
+      c.children[0].onclick=e=>{e.stopPropagation();move(i,-1).catch(x=>toast(x.message,'error'))};
+      c.children[1].onclick=e=>{e.stopPropagation();move(i,1).catch(x=>toast(x.message,'error'))};el.appendChild(c);
     });
   }
-
-  const observer = new MutationObserver(enhanceList);
-  window.addEventListener('DOMContentLoaded', () => {
-    const list = document.getElementById('questionList');
-    if (list) observer.observe(list, { childList: true, subtree: false });
-    enhanceList();
-  });
+  const obs=new MutationObserver(enhance);const list=document.getElementById('questionList');if(list)obs.observe(list,{childList:true});enhance();
 })();
