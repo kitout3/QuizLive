@@ -4,6 +4,7 @@
 
   const cleanName = value => String(value || '').trim().slice(0, 80).replace(/[<>"'&]/g, '');
   const cleanEmail = value => String(value || '').trim().toLowerCase();
+  let googleLoginPending = false;
 
   function authMessage(error) {
     const map = {
@@ -13,8 +14,12 @@
       'auth/user-not-found': 'Aucun compte ne correspond à cette adresse email.',
       'auth/wrong-password': 'Mot de passe incorrect.',
       'auth/invalid-credential': 'Email ou mot de passe incorrect.',
-      'auth/unauthorized-domain': 'Le domaine GitHub Pages n’est pas autorisé dans Firebase.',
-      'auth/operation-not-allowed': 'La connexion Google n’est pas activée dans Firebase.'
+      'auth/unauthorized-domain': 'Le domaine kitout3.github.io n’est pas autorisé dans Firebase Authentication.',
+      'auth/operation-not-allowed': 'La connexion Google n’est pas activée dans Firebase.',
+      'auth/popup-blocked': 'Le navigateur a bloqué la fenêtre Google. Autorisez les fenêtres pop-up pour kitout3.github.io.',
+      'auth/popup-closed-by-user': 'La fenêtre Google a été fermée avant la fin de la connexion.',
+      'auth/cancelled-popup-request': 'Une tentative de connexion Google est déjà en cours.',
+      'auth/account-exists-with-different-credential': 'Un compte existe déjà avec cette adresse email et une autre méthode de connexion.'
     };
     return map[error?.code] || error?.message || 'Authentification impossible.';
   }
@@ -50,26 +55,23 @@
   }
 
   async function signInWithGoogle() {
-    sessionStorage.setItem('quizliveGoogleRedirect', '1');
-    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    return firebase.auth().signInWithRedirect(provider);
-  }
+    if (googleLoginPending) {
+      const error = new Error('Une tentative de connexion Google est déjà en cours.');
+      error.code = 'auth/cancelled-popup-request';
+      throw error;
+    }
 
-  async function finishGoogleRedirect() {
+    googleLoginPending = true;
     try {
-      const result = await firebase.auth().getRedirectResult();
-      const user = result?.user;
-      if (!user) return;
-      sessionStorage.removeItem('quizliveGoogleRedirect');
-      await saveOrganizerProfile(user, user.displayName);
+      await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const credential = await firebase.auth().signInWithPopup(provider);
+      await saveOrganizerProfile(credential.user, credential.user.displayName);
       localStorage.setItem('quizliveHomeRole', 'organizer');
-      if (typeof showToast === 'function') showToast('Connexion Google réussie');
-    } catch (error) {
-      sessionStorage.removeItem('quizliveGoogleRedirect');
-      console.error('Retour Google:', error);
-      if (typeof showToast === 'function') showToast(authMessage(error), 'error');
+      return credential.user;
+    } finally {
+      googleLoginPending = false;
     }
   }
 
@@ -163,7 +165,6 @@
     loginOrganizer
   };
 
-  finishGoogleRedirect();
   installOwnedSessionCreation();
   protectAdminSession();
 })();
