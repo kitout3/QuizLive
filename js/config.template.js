@@ -9,6 +9,8 @@ const firebaseConfig = {
     appId: "%%FIREBASE_APP_ID%%"
 };
 
+window.QUIZLIVE_FIREBASE_CONFIG = firebaseConfig;
+
 const ADMIN_UID_CONFIG = localStorage.getItem('organizerUid') || "%%FIREBASE_ADMIN_UID%%";
 const PPTX_CONVERTER_URL_CONFIG = "%%PPTX_CONVERTER_URL%%";
 
@@ -31,26 +33,27 @@ function loadQuizModule(src) {
 window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
     try {
-        await loadQuizModule('js/organizer-auth.js?v=22');
-        await loadQuizModule('js/platform-features.js?v=22');
+        await loadQuizModule('js/organizer-auth.js?v=23');
+        await loadQuizModule('js/platform-features.js?v=23');
 
         if (document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/home-role-flow.js?v=22');
+            await loadQuizModule('js/home-role-flow.js?v=23');
         }
 
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=22');
-            await loadQuizModule('js/participant-guard.js?v=22');
+            await loadQuizModule('js/player-session-auth.js?v=23');
+            await loadQuizModule('js/participant-guard.js?v=23');
         }
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=22');
+            await loadQuizModule('js/speed-scoring.js?v=23');
         }
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=22');
-            await loadQuizModule('js/pptx-import.js?v=22');
+            await loadQuizModule('js/participant-guard.js?v=23');
+            await loadQuizModule('js/pptx-import.js?v=23');
+            await loadQuizModule('js/ai-question-generator.js?v=23');
         }
 
-        await loadQuizModule('js/unified-runtime.js?v=22');
+        await loadQuizModule('js/unified-runtime.js?v=23');
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
     }
