@@ -51,7 +51,7 @@
     "organizationGroupMembers": {
       "$organizationId": {
         "$groupId": {
-          ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
+          ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).child('groupIds').child($groupId).val() === true || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
           "$uid": {
             ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || auth.uid === $uid)"
           }
@@ -63,6 +63,13 @@
       "$emailKey": {
         ".read": "auth != null && (data.child('createdBy').val() === auth.uid || (auth.token.email != null && data.child('email').val() === auth.token.email))",
         ".write": "auth != null && ((!data.exists() && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid) || (data.exists() && auth.token.email != null && data.child('email').val() === auth.token.email))"
+      }
+    },
+
+    "organizationInvites": {
+      "$inviteCode": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid) || (data.exists() && data.child('status').val() === 'pending' && newData.child('status').val() === 'accepted' && newData.child('acceptedBy').val() === auth.uid))"
       }
     },
 
@@ -85,10 +92,13 @@
     "groupSessions": {
       "$organizationId": {
         "$groupId": {
-          ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
+          ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).child('groupIds').child($groupId).val() === true || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
           "$code": {
-            ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
-            ".validate": "!newData.exists() || (newData.hasChildren(['code','name','ownerUid','status','createdAt','updatedAt']) && newData.child('code').val() === $code && newData.child('name').isString() && newData.child('name').val().length <= 120 && newData.child('ownerUid').isString() && newData.child('status').isString() && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber())"
+            ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).child('groupIds').child($groupId).val() === true || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
+            ".validate": "!newData.exists() || (newData.hasChildren(['code','name','ownerUid','status','createdAt','updatedAt']) && newData.child('code').val() === $code && newData.child('name').isString() && newData.child('name').val().length <= 120 && newData.child('ownerUid').isString() && newData.child('status').isString() && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber())",
+            "ownerEmail": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 320)"
+            }
           }
         }
       }
@@ -120,7 +130,7 @@
     "sessions": {
       "$code": {
         ".read": true,
-        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && (data.child('ownerUid').val() === auth.uid || (data.child('organizationId').isString() && data.child('groupId').isString() && root.child('organizationGroupMembers').child(data.child('organizationId').val()).child(data.child('groupId').val()).child(auth.uid).exists()) || (data.child('organizationId').isString() && root.child('organizations').child(data.child('organizationId').val()).child('ownerUid').val() === auth.uid))))",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && (data.child('ownerUid').val() === auth.uid || (data.child('organizationId').isString() && root.child('organizations').child(data.child('organizationId').val()).child('ownerUid').val() === auth.uid) || (data.child('organizationId').isString() && data.child('groupId').isString() && root.child('organizationMembers').child(data.child('organizationId').val()).child(auth.uid).child('groupIds').child(data.child('groupId').val()).val() === true) || (data.child('organizationId').isString() && data.child('groupId').isString() && root.child('organizationGroupMembers').child(data.child('organizationId').val()).child(data.child('groupId').val()).child(auth.uid).exists()))))",
 
         "participants": {
           "$participantId": {
