@@ -66,6 +66,8 @@
         questionCount: questions.filter(q => itemKind(q) === 'Question').length
       };
     }));
+
+    // Ignore stale index entries whose session no longer exists.
     quizItems = full.filter(item => item.session.ownerUid === currentUser.uid);
   }
 
@@ -212,6 +214,17 @@
     }
   }
 
+  async function cleanSessionPseudos(code) {
+    try {
+      const snap = await database.ref(`sessionPseudos/${code}`).once('value');
+      const pseudos = snap.val() || {};
+      const removals = Object.keys(pseudos).map(key => database.ref(`sessionPseudos/${code}/${key}`).remove());
+      await Promise.allSettled(removals);
+    } catch (error) {
+      console.warn('Nettoyage des pseudos non bloquant :', error);
+    }
+  }
+
   async function deleteQuiz(code) {
     const item = quizItems.find(entry => entry.code === code);
     if (!item) return;
@@ -219,16 +232,26 @@
     if (!confirmation) return;
 
     try {
-      const updates = {};
-      updates[`sessions/${code}`] = null;
-      updates[`organizerSessions/${currentUser.uid}/${code}`] = null;
-      updates[`sessionPseudos/${code}`] = null;
-      await database.ref().update(updates);
+      // Remove the two authoritative records first. Pseudo cleanup must not cancel deletion.
+      await database.ref().update({
+        [`sessions/${code}`]: null,
+        [`organizerSessions/${currentUser.uid}/${code}`]: null
+      });
+
+      await cleanSessionPseudos(code);
+      quizItems = quizItems.filter(entry => entry.code !== code);
+      selectedCode = null;
+      drawQuizCards(document.getElementById('quizLibrarySearch')?.value || '');
+      renderPreview(null);
+      const counter = document.getElementById('quizLibraryCount');
+      if (counter) counter.textContent = `${quizItems.length} quiz`;
       notify('Quiz supprimé.');
+
+      // Confirm against Firebase after updating the interface.
       await refreshLibrary();
     } catch (error) {
       console.error(error);
-      notify('Suppression impossible. Vérifiez les règles Firebase.', 'error');
+      notify(error?.code === 'PERMISSION_DENIED' ? 'Suppression refusée par les règles Firebase.' : 'Suppression impossible.', 'error');
     }
   }
 
