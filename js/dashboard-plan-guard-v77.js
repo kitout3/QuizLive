@@ -52,6 +52,33 @@
     return button;
   }
 
+  function ensureCurrentBadge(card) {
+    let badge = card.querySelector('.dashboard-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'dashboard-badge';
+      card.appendChild(badge);
+    }
+    const text = currentBadgeText();
+    if (badge.textContent !== text) badge.textContent = text;
+  }
+
+  function ensureCheckoutButton(card, key) {
+    let button = card.querySelector(`[data-checkout="${key}"]`);
+    card.querySelectorAll('[data-checkout]').forEach(other => {
+      if (other !== button) other.remove();
+    });
+
+    if (!button) {
+      button = makeCheckoutButton(key);
+      card.appendChild(button);
+    }
+
+    const text = chooseText();
+    if (button.textContent !== text) button.textContent = text;
+    button.onclick = () => window.QuizBilling?.startCheckout?.(key);
+  }
+
   function correctBilling() {
     const grid = content?.querySelector('.dashboard-plan-grid');
     if (!grid || !entitlements) return;
@@ -66,15 +93,18 @@
 
       const isCurrent = key === current;
       card.classList.toggle('current', isCurrent);
-      card.querySelectorAll('.dashboard-badge,[data-checkout]').forEach(element => element.remove());
 
       if (isCurrent) {
-        const badge = document.createElement('span');
-        badge.className = 'dashboard-badge';
-        badge.textContent = currentBadgeText();
-        card.appendChild(badge);
-      } else if (key !== 'free') {
-        card.appendChild(makeCheckoutButton(key));
+        card.querySelectorAll('[data-checkout]').forEach(element => element.remove());
+        ensureCurrentBadge(card);
+        return;
+      }
+
+      card.querySelectorAll('.dashboard-badge').forEach(element => element.remove());
+      if (key === 'free') {
+        card.querySelectorAll('[data-checkout]').forEach(element => element.remove());
+      } else {
+        ensureCheckoutButton(card, key);
       }
     });
   }
@@ -88,7 +118,8 @@
       const label = line.querySelector('.dashboard-muted')?.textContent?.trim().toLowerCase() || '';
       if (!['abonnement', 'subscription'].includes(label)) return;
       const value = line.querySelector('strong');
-      if (value) value.textContent = `${plan[lang()]} · ${plan.limit} participants`;
+      const expected = `${plan[lang()]} · ${plan.limit} participants`;
+      if (value && value.textContent !== expected) value.textContent = expected;
     });
   }
 
