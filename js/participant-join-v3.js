@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.1.0';
+  const VERSION = '3.1.1';
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -41,7 +41,6 @@
       throw new Error('Ce navigateur est connecté comme organisateur. Ouvrez le lien participant dans une fenêtre privée ou sur un autre appareil.');
     }
 
-    // Un nouvel onglet de test doit obtenir sa propre identité participante.
     if (current?.isAnonymous && tabUid && current.uid === tabUid) return current;
     if (current?.isAnonymous && (!tabUid || current.uid !== tabUid)) {
       await auth.signOut();
@@ -119,7 +118,7 @@
       sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
       localStorage.setItem('quizSession', JSON.stringify(sessionData));
 
-      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=56`);
+      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=57`);
     } catch (error) {
       notify(readableError(error, step), 'error');
     } finally {
