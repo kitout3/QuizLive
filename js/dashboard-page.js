@@ -23,10 +23,15 @@
     subtitle.textContent = sub;
   }
 
+  function normalizedPlan(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
   function activePlanKey() {
-    const subscriptionPlan = String(organizer?.subscription?.plan || '').toLowerCase();
-    const profilePlan = String(organizer?.profile?.plan || '').toLowerCase();
-    if (plans[subscriptionPlan] && organizer?.subscription?.status !== 'inactive') return subscriptionPlan;
+    const subscriptionPlan = normalizedPlan(organizer?.subscription?.plan);
+    const profilePlan = normalizedPlan(organizer?.profile?.plan);
+    const subscriptionStatus = normalizedPlan(organizer?.subscription?.status);
+    if (plans[subscriptionPlan] && subscriptionStatus !== 'inactive' && subscriptionStatus !== 'canceled' && subscriptionStatus !== 'cancelled') return subscriptionPlan;
     return plans[profilePlan] ? profilePlan : 'free';
   }
 
@@ -92,7 +97,11 @@
     setHeading('Abonnement', 'Choisissez votre capacité maximale de participants par session.');
     const subscription = organizer.subscription || {};
     const current = activePlanKey();
-    content.innerHTML = `<div class="dashboard-plan-grid">${Object.entries(plans).map(([key, plan]) => `<article class="dashboard-plan ${key === current ? 'current' : ''}"><h2>${plan.label}</h2><div class="dashboard-plan-price">${plan.price} €<small style="font-size:14px;font-weight:500">/mois</small></div><p><strong>${plan.limit}</strong> participants maximum par session</p>${key === current ? '<span class="dashboard-badge">Offre actuelle</span>' : key === 'free' ? '' : `<button class="btn-primary" data-checkout="${key}">Choisir cette offre</button>`}</article>`).join('')}</div>${subscription.stripeCustomerId ? '<button class="btn-primary" id="billingPortal" style="justify-self:start">Gérer mon abonnement et mes factures</button>' : ''}`;
+    const hasSubscription = Object.keys(subscription).length > 0;
+    const diagnostic = !hasSubscription
+      ? `<article class="dashboard-card" style="margin-bottom:20px;border:1px solid #ef6b73"><h2>Abonnement introuvable pour ce compte</h2><p>Ajoute l’abonnement dans Firebase sous l’UID connecté ci-dessous :</p><code style="display:block;padding:12px;border-radius:8px;background:#0d1020;word-break:break-all">subscriptions/${esc(organizer.user.uid)}</code><p class="dashboard-muted">UID connecté : ${esc(organizer.user.uid)}</p></article>`
+      : `<article class="dashboard-card" style="margin-bottom:20px"><div class="dashboard-profile-line"><span class="dashboard-muted">UID connecté</span><strong style="word-break:break-all">${esc(organizer.user.uid)}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Plan lu dans Firebase</span><strong>${esc(subscription.plan || 'non renseigné')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Statut</span><strong>${esc(subscription.status || 'non renseigné')}</strong></div></article>`;
+    content.innerHTML = `${diagnostic}<div class="dashboard-plan-grid">${Object.entries(plans).map(([key, plan]) => `<article class="dashboard-plan ${key === current ? 'current' : ''}"><h2>${plan.label}</h2><div class="dashboard-plan-price">${plan.price} €<small style="font-size:14px;font-weight:500">/mois</small></div><p><strong>${plan.limit}</strong> participants maximum par session</p>${key === current ? '<span class="dashboard-badge">Offre actuelle</span>' : key === 'free' ? '' : `<button class="btn-primary" data-checkout="${key}">Choisir cette offre</button>`}</article>`).join('')}</div>${subscription.stripeCustomerId ? '<button class="btn-primary" id="billingPortal" style="justify-self:start">Gérer mon abonnement et mes factures</button>' : ''}`;
     content.querySelectorAll('[data-checkout]').forEach(button => button.onclick = () => window.QuizBilling?.startCheckout(button.dataset.checkout));
     document.getElementById('billingPortal')?.addEventListener('click', () => window.QuizBilling?.openBillingPortal());
   }
@@ -100,7 +109,7 @@
   function renderProfile() {
     setHeading('Mon profil', 'Informations du compte organisateur connecté.');
     const profile = organizer.profile;
-    content.innerHTML = `<article class="dashboard-card"><h2>Informations personnelles</h2><div class="dashboard-profile-line"><span class="dashboard-muted">Nom</span><strong>${esc(profile.displayName || organizer.user.displayName || 'Non renseigné')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Adresse email</span><strong>${esc(organizer.user.email || profile.email || '')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Méthode de connexion</span><strong>${esc(organizer.user.providerData?.[0]?.providerId || profile.provider || 'email')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Statut</span><strong>${profile.active === false ? 'Inactif' : 'Actif'}</strong></div></article>`;
+    content.innerHTML = `<article class="dashboard-card"><h2>Informations personnelles</h2><div class="dashboard-profile-line"><span class="dashboard-muted">Nom</span><strong>${esc(profile.displayName || organizer.user.displayName || 'Non renseigné')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Adresse email</span><strong>${esc(organizer.user.email || profile.email || '')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">UID Firebase</span><strong style="word-break:break-all">${esc(organizer.user.uid)}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Méthode de connexion</span><strong>${esc(organizer.user.providerData?.[0]?.providerId || profile.provider || 'email')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Statut</span><strong>${profile.active === false ? 'Inactif' : 'Actif'}</strong></div></article>`;
   }
 
   async function switchSection(section) {
