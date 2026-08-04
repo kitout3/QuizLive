@@ -12,15 +12,15 @@
 
   function safeReturnUrl() {
     const params = new URLSearchParams(location.search);
-    const requested = params.get('return') || params.get('next') || sessionStorage.getItem('quizliveAuthReturn') || 'dashboard.html';
+    const requested = params.get('return') || params.get('next') || sessionStorage.getItem('quizliveAuthReturn') || 'index.html';
     sessionStorage.removeItem('quizliveAuthReturn');
     try {
       const decoded = decodeURIComponent(requested);
       const target = new URL(decoded, location.href);
-      if (target.origin !== location.origin || !target.pathname.startsWith('/QuizLive/')) return 'dashboard.html';
-      return `${target.pathname.split('/QuizLive/')[1] || 'dashboard.html'}${target.search}${target.hash}`;
+      if (target.origin !== location.origin || !target.pathname.startsWith('/QuizLive/')) return 'index.html';
+      return `${target.pathname.split('/QuizLive/')[1] || 'index.html'}${target.search}${target.hash}`;
     } catch (_) {
-      return 'dashboard.html';
+      return 'index.html';
     }
   }
 
@@ -45,7 +45,7 @@
   }
 
   function goBackToRequestedPage() {
-    location.replace(returnUrl || 'dashboard.html');
+    location.replace(returnUrl || 'index.html');
   }
 
   function togglePassword() {
@@ -79,12 +79,10 @@
     setError('');
     setSuccess('');
     submitButton.disabled = true;
-
     try {
       const organizer = await waitForOrganizer();
       const email = document.getElementById('authEmail')?.value.trim() || '';
       const password = document.getElementById('authPassword')?.value || '';
-
       if (page === 'login') {
         await organizer.loginOrganizer(email, password);
         goBackToRequestedPage();
@@ -108,7 +106,6 @@
   document.getElementById('authForm')?.addEventListener('submit', submit);
   document.getElementById('authEye')?.addEventListener('click', togglePassword);
   googleButton?.addEventListener('click', googleAuth);
-
   firebase.auth().onAuthStateChanged(user => {
     if (user && !user.isAnonymous && page !== 'forgot') goBackToRequestedPage();
   });
