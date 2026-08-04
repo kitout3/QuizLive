@@ -6,6 +6,7 @@
   <title>Éditeur de quiz — QuizLive</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/editor.css">
+  <link rel="stylesheet" href="css/editor-pptx-question-bank.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body data-page="editor" class="editor-page">
@@ -53,9 +54,12 @@
     <aside class="editor-tools">
       <h2>Ajouter du contenu</h2>
       <button class="editor-tool" id="aiTool"><span>✨</span><div><strong>Générer avec l’IA</strong><small>Thème, niveau et quantité</small></div></button>
+      <button class="editor-tool" id="questionBankTool"><span>📚</span><div><strong>Banque de questions</strong><small>Rechercher et réutiliser</small></div></button>
+      <button class="editor-tool" id="pptxTool"><span>📽️</span><div><strong>Importer PowerPoint</strong><small>Conversion automatique fidèle</small></div></button>
       <button class="editor-tool" id="excelTool"><span>📊</span><div><strong>Importer Excel / CSV</strong><small>Questions et réponses</small></div></button>
       <button class="editor-tool" id="pdfTool"><span>📄</span><div><strong>Importer un PDF</strong><small>Une page devient une slide</small></div></button>
       <button class="editor-tool" id="slidesTool"><span>🖼️</span><div><strong>Importer des images</strong><small>PNG, JPG ou WebP</small></div></button>
+      <input id="pptxInput" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
       <input id="spreadsheetInput" type="file" accept=".xlsx,.xls,.csv" hidden>
       <input id="pdfInput" type="file" accept="application/pdf" hidden>
       <input id="imagesInput" type="file" accept="image/*" multiple hidden>
@@ -85,6 +89,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/editor-page.js?v=34"></script>
+  <script src="js/editor-page.js?v=35"></script>
+  <script src="js/editor-pptx-question-bank.js?v=35"></script>
 </body>
 </html>
