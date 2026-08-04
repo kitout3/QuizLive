@@ -1,15 +1,22 @@
 (() => {
   'use strict';
 
-  let currentUser = null;
+  const db = window.QuizLiveFirebase?.organizerDatabase || database;
+  const auth = window.QuizLiveFirebase?.organizerAuth || firebase.auth();
   const busy = new Set();
+  let currentUser = null;
 
   const normalizeEmail = value => String(value || '').trim().toLowerCase();
   const emailKey = email => btoa(unescape(encodeURIComponent(normalizeEmail(email))))
-    .replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    .replace(/=+$/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
 
   function notify(text, type = 'success') {
-    if (typeof window.showToast === 'function') return window.showToast(text, type);
+    if (typeof window.showToast === 'function') {
+      window.showToast(text, type);
+      return;
+    }
     const content = document.getElementById('dashboardContent');
     if (!content) return;
     const notice = document.createElement('div');
@@ -21,22 +28,28 @@
 
   async function context() {
     if (!currentUser) throw new Error('Compte organisateur non connecté.');
+
     const [profileSnap, linksSnap] = await Promise.all([
-      database.ref(`organizers/${currentUser.uid}`).once('value'),
-      database.ref(`userOrganizations/${currentUser.uid}`).once('value')
+      db.ref(`organizers/${currentUser.uid}`).once('value'),
+      db.ref(`userOrganizations/${currentUser.uid}`).once('value')
     ]);
+
     const profile = profileSnap.val() || {};
     const links = linksSnap.val() || {};
     const organizationId = profile.defaultOrganizationId || Object.keys(links)[0] || '';
     if (!organizationId) throw new Error('Organisation introuvable.');
 
     const [organizationSnap, membersSnap, groupsSnap] = await Promise.all([
-      database.ref(`organizations/${organizationId}`).once('value'),
-      database.ref(`organizationMembers/${organizationId}`).once('value'),
-      database.ref(`organizationGroups/${organizationId}`).once('value')
+      db.ref(`organizations/${organizationId}`).once('value'),
+      db.ref(`organizationMembers/${organizationId}`).once('value'),
+      db.ref(`organizationGroups/${organizationId}`).once('value')
     ]);
+
     const organization = organizationSnap.val() || {};
-    if (organization.ownerUid !== currentUser.uid) throw new Error('Action réservée au propriétaire.');
+    if (organization.ownerUid !== currentUser.uid) {
+      throw new Error('Action réservée au propriétaire.');
+    }
+
     return {
       organizationId,
       organization,
@@ -46,11 +59,11 @@
   }
 
   function updateCounter(selector, delta, minimum = 0) {
-    const el = document.querySelector(selector);
-    if (!el) return;
-    const match = el.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+    const element = document.querySelector(selector);
+    if (!element) return;
+    const match = element.textContent.match(/(\d+)\s*\/\s*(\d+)/);
     if (!match) return;
-    el.textContent = `${Math.max(minimum, Number(match[1]) + delta)}/${match[2]}`;
+    element.textContent = `${Math.max(minimum, Number(match[1]) + delta)}/${match[2]}`;
   }
 
   function optimisticRemove(element) {
@@ -62,12 +75,24 @@
     element.style.transform = 'scale(.98)';
     element.style.transition = 'opacity .14s ease, transform .14s ease';
     setTimeout(() => element.remove(), 140);
+
     return () => {
       element.style.opacity = '';
       element.style.transform = '';
       element.style.pointerEvents = '';
       if (!element.isConnected) parent.insertBefore(element, next);
     };
+  }
+
+  function synchronizeRemainingGroups(updates, ctx, uid, remaining) {
+    const ids = Object.keys(remaining);
+    updates[`organizationMembers/${ctx.organizationId}/${uid}/groupIds`] = remaining;
+    updates[`userOrganizations/${uid}/${ctx.organizationId}/groupIds`] = remaining;
+
+    const primaryId = ids[0];
+    const primaryGroup = ctx.groups[primaryId] || {};
+    updates[`userOrganizations/${uid}/${ctx.organizationId}/groupId`] = primaryId;
+    updates[`userOrganizations/${uid}/${ctx.organizationId}/groupName`] = primaryGroup.name || 'Groupe';
   }
 
   async function deleteInvite(button) {
@@ -87,12 +112,11 @@
 
     try {
       const ctx = await context();
-      const updates = {
+      await db.ref().update({
         [`organizations/${ctx.organizationId}/pendingInvites/${key}`]: null,
         [`organizationEmailInvites/${key}`]: null
-      };
-      await database.ref().update(updates);
-      notify('Invitation supprimée. L’adresse peut être réinvitée immédiatement.');
+      });
+      notify('Invitation supprimée.');
       window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
     } catch (error) {
       rollback();
@@ -110,6 +134,7 @@
     const card = button.closest('.enterprise-group-card');
     const groupId = card?.querySelector('[data-delete-group]')?.dataset.deleteGroup || '';
     const groupName = card?.querySelector('h3')?.textContent?.trim() || 'ce groupe';
+
     if (!uid || !groupId) throw new Error('Membre ou groupe introuvable.');
     if (!confirm(`Retirer cette personne du groupe « ${groupName} » ?`)) return;
 
@@ -123,20 +148,24 @@
       const ctx = await context();
       const member = ctx.members[uid];
       if (!member) throw new Error('Membre introuvable.');
+
       const remaining = { ...(member.groupIds || {}) };
       delete remaining[groupId];
+
       const updates = {
         [`organizationGroupMembers/${ctx.organizationId}/${groupId}/${uid}`]: null
       };
+
       if (Object.keys(remaining).length) {
-        updates[`organizationMembers/${ctx.organizationId}/${uid}/groupIds`] = remaining;
+        synchronizeRemainingGroups(updates, ctx, uid, remaining);
       } else {
         updates[`organizationMembers/${ctx.organizationId}/${uid}`] = null;
         updates[`userOrganizations/${uid}/${ctx.organizationId}`] = null;
         updateCounter('.enterprise-summary .dashboard-stat:first-child strong', -1, 1);
       }
-      await database.ref().update(updates);
-      notify('Accès supprimé instantanément.');
+
+      await db.ref().update(updates);
+      notify('Accès supprimé et index synchronisés.');
       window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
     } catch (error) {
       rollback();
@@ -151,8 +180,9 @@
     const groupId = button.dataset.deleteGroup;
     const card = button.closest('.enterprise-group-card');
     const groupName = card?.querySelector('h3')?.textContent?.trim() || 'Sans nom';
+
     if (!groupId) throw new Error('Groupe introuvable.');
-    if (!confirm(`Supprimer définitivement le groupe « ${groupName} » ?\n\nLes invitations et accès associés seront également supprimés.`)) return;
+    if (!confirm(`Supprimer définitivement le groupe « ${groupName} » ?\n\nLes accès, invitations et index de quiz associés seront supprimés.`)) return;
 
     const lock = `group:${groupId}`;
     if (busy.has(lock)) return;
@@ -165,32 +195,36 @@
       const ctx = await context();
       const updates = {
         [`organizationGroups/${ctx.organizationId}/${groupId}`]: null,
-        [`organizationGroupMembers/${ctx.organizationId}/${groupId}`]: null
+        [`organizationGroupMembers/${ctx.organizationId}/${groupId}`]: null,
+        [`groupSessions/${ctx.organizationId}/${groupId}`]: null
       };
 
       for (const [uid, member] of Object.entries(ctx.members)) {
         if (uid === currentUser.uid || !member?.groupIds?.[groupId]) continue;
         const remaining = { ...(member.groupIds || {}) };
         delete remaining[groupId];
+
         if (Object.keys(remaining).length) {
-          updates[`organizationMembers/${ctx.organizationId}/${uid}/groupIds`] = remaining;
+          synchronizeRemainingGroups(updates, ctx, uid, remaining);
         } else {
           updates[`organizationMembers/${ctx.organizationId}/${uid}`] = null;
           updates[`userOrganizations/${uid}/${ctx.organizationId}`] = null;
         }
       }
 
-      let removedAccounts = 0;
+      let removedInvites = 0;
       for (const invite of Object.values(ctx.organization.pendingInvites || {})) {
         if (invite?.groupId !== groupId) continue;
         const key = invite.emailKey || emailKey(invite.email);
         updates[`organizations/${ctx.organizationId}/pendingInvites/${key}`] = null;
         updates[`organizationEmailInvites/${key}`] = null;
-        removedAccounts += 1;
+        removedInvites += 1;
       }
 
-      await database.ref().update(updates);
-      if (removedAccounts) updateCounter('.enterprise-summary .dashboard-stat:first-child strong', -removedAccounts, 1);
+      await db.ref().update(updates);
+      if (removedInvites) {
+        updateCounter('.enterprise-summary .dashboard-stat:first-child strong', -removedInvites, 1);
+      }
       notify(`Groupe « ${groupName} » supprimé.`);
       window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
     } catch (error) {
@@ -219,12 +253,12 @@
       else if (memberButton) await removeMember(memberButton);
       else await deleteGroup(groupButton);
     } catch (error) {
-      console.error('Suppression Enterprise :', error);
-      notify(error?.message || 'Suppression impossible.', 'error');
+      console.error('Gestion Enterprise :', error);
+      notify(error.message || 'Action impossible.', 'error');
     }
   }, true);
 
-  firebase.auth().onAuthStateChanged(user => {
+  auth.onAuthStateChanged(user => {
     currentUser = user && !user.isAnonymous ? user : null;
   });
 })();
