@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Connexion organisateur - QuizLive</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/auth-pages.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="auth-page" data-auth-page="login">
+  <div class="background-effects"><div class="gradient-orb orb-1"></div><div class="gradient-orb orb-2"></div><div class="grid-overlay"></div></div>
+  <header class="auth-header"><a class="auth-brand" href="index.html">⚡ QuizLive</a><a class="auth-back" href="index.html">← Retour</a></header>
+  <main class="auth-main">
+    <section class="auth-card">
+      <h1>Se connecter</h1>
+      <p class="auth-intro">Accédez à votre espace organisateur et à vos quiz.</p>
+      <button type="button" id="authGoogle" class="auth-google">G Continuer avec Google</button>
+      <div class="auth-separator">ou</div>
+      <form id="authForm">
+        <div class="auth-field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" placeholder="email@exemple.com" required></div>
+        <div class="auth-field"><label for="authPassword">Mot de passe</label><div class="auth-password-wrap"><input id="authPassword" type="password" autocomplete="current-password" placeholder="Votre mot de passe" required><button type="button" id="authEye" class="auth-eye" aria-label="Afficher le mot de passe">👁</button></div></div>
+        <div id="authPageError" class="auth-error" role="alert"></div>
+        <button id="authSubmit" class="auth-submit" type="submit">Se connecter</button>
+      </form>
+      <div class="auth-links"><a href="forgot-password.html">Mot de passe oublié ?</a><a href="register.html">Créer un compte</a></div>
+    </section>
+  </main>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth-pages.js?v=1"></script>
+</body>
+</html>
