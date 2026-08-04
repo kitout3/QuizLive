@@ -18,9 +18,14 @@
     throw new Error('Impossible de générer un code de session unique.');
   }
 
-  async function participantLimit(uid) {
+  async function participantLimit(user) {
     try {
-      const snap = await db.ref(`subscriptions/${uid}/participantLimit`).once('value');
+      const entitlements = await window.QuizLiveEntitlements?.resolve?.(user, true);
+      if (entitlements?.participantLimit) {
+        return Math.max(1, Math.min(5000, Number(entitlements.participantLimit)));
+      }
+
+      const snap = await db.ref(`subscriptions/${user.uid}/participantLimit`).once('value');
       return Math.max(1, Math.min(5000, Number(snap.val() || 10)));
     } catch (_) {
       return 10;
@@ -40,7 +45,7 @@
 
     const [sessionCode, maxParticipants, group] = await Promise.all([
       uniqueCode(),
-      participantLimit(user.uid),
+      participantLimit(user),
       selectedGroup()
     ]);
 
