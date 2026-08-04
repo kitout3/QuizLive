@@ -23,26 +23,26 @@
       const organizationId = profile.defaultOrganizationId || Object.keys(links)[0] || '';
       if (!organizationId) return { organizationId: '', organization: {}, membership: {}, groups: [], isOwner: false };
 
-      const [organizationSnap, membershipSnap, groupsSnap, groupMembersSnap] = await Promise.all([
+      const [organizationSnap, membershipSnap, groupsSnap] = await Promise.all([
         database.ref(`organizations/${organizationId}`).once('value'),
         database.ref(`organizationMembers/${organizationId}/${currentUser.uid}`).once('value'),
-        database.ref(`organizationGroups/${organizationId}`).once('value'),
-        database.ref(`organizationGroupMembers/${organizationId}`).once('value')
+        database.ref(`organizationGroups/${organizationId}`).once('value')
       ]);
 
       const organization = organizationSnap.val() || {};
       const membership = membershipSnap.val() || {};
       const allGroups = Object.entries(groupsSnap.val() || {}).map(([id, value]) => ({ id, ...value }));
-      const groupMemberTree = groupMembersSnap.val() || {};
       const isOwner = organization.ownerUid === currentUser.uid;
 
-      const accessibleGroupIds = new Set(Object.keys(membership.groupIds || {}).filter(id => membership.groupIds[id] === true));
-      Object.entries(groupMemberTree).forEach(([groupId, members]) => {
-        if (members && members[currentUser.uid]) accessibleGroupIds.add(groupId);
-      });
+      const accessibleGroupIds = new Set(
+        Object.keys(membership.groupIds || {}).filter(id => membership.groupIds[id] === true)
+      );
 
-      const linkedGroupId = links[organizationId]?.groupId;
-      if (linkedGroupId) accessibleGroupIds.add(linkedGroupId);
+      const linkedOrganization = links[organizationId] || {};
+      if (linkedOrganization.groupId) accessibleGroupIds.add(linkedOrganization.groupId);
+      Object.keys(linkedOrganization.groupIds || {}).forEach(groupId => {
+        if (linkedOrganization.groupIds[groupId] === true) accessibleGroupIds.add(groupId);
+      });
 
       const groups = isOwner ? allGroups : allGroups.filter(group => accessibleGroupIds.has(group.id));
       return { organizationId, organization, membership, groups, isOwner };
