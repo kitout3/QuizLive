@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '4.0.0';
+  const VERSION = '4.1.0';
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -15,10 +15,7 @@
     if (!services?.participantAuth || !services?.participantDatabase) {
       throw new Error('Le module Firebase participant n’est pas initialisé. Rechargez la page.');
     }
-    return {
-      auth: services.participantAuth,
-      db: services.participantDatabase
-    };
+    return { auth: services.participantAuth, db: services.participantDatabase };
   }
 
   function notify(text, type = 'error') {
@@ -28,9 +25,9 @@
 
   function readableError(error, step) {
     const code = String(error?.code || '').toLowerCase();
-    console.error(`[Participant v4] ${step}`, error);
+    console.error(`[Participant ${VERSION}] ${step}`, error);
     if (code.includes('permission-denied') || code.includes('permission_denied')) {
-      return `Accès Firebase refusé pendant l’étape « ${step} ». Vérifiez les règles Realtime Database publiées.`;
+      return `Accès Firebase refusé pendant l’étape « ${step} ».`;
     }
     if (code.includes('operation-not-allowed')) {
       return 'La connexion anonyme n’est pas activée dans Firebase Authentication.';
@@ -44,14 +41,12 @@
   async function getAnonymousUser() {
     const { auth } = participantServices();
 
-    // Persistance propre à l'instance Firebase secondaire. Elle ne touche jamais
-    // la connexion email/mot de passe de l'organisateur sur l'instance principale.
-    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    // Persistance uniquement en mémoire : aucun cookie, IndexedDB ou localStorage
+    // participant ne peut modifier la connexion organisateur.
+    await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
 
-    const current = auth.currentUser;
-    if (current?.isAnonymous) return current;
+    if (auth.currentUser?.isAnonymous) return auth.currentUser;
 
-    // Aucun signOut() de l'instance principale n'est exécuté ici.
     const credential = await auth.signInAnonymously();
     if (!credential?.user?.uid) {
       throw new Error('Firebase n’a pas créé de compte participant anonyme.');
@@ -95,14 +90,11 @@
 
       step = 'inscription du participant';
       const participantRef = db.ref(`sessions/${code}/participants/${user.uid}`);
-      const existingSnap = await participantRef.once('value');
-      const existing = existingSnap.val() || {};
       const now = Date.now();
-
       await participantRef.set({
         id: user.uid,
         name,
-        joinedAt: Number(existing.joinedAt || now),
+        joinedAt: now,
         lastSeenAt: now,
         connected: true
       });
@@ -117,12 +109,10 @@
         joinVersion: VERSION
       };
 
-      // Stockage limité à cet onglet. Ne remplace jamais la session locale
-      // de l'organisateur ouverte dans un autre onglet du même navigateur.
       sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
       sessionStorage.setItem('quizliveParticipantUid', user.uid);
 
-      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=58`);
+      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=59`);
     } catch (error) {
       notify(readableError(error, step), 'error');
     } finally {
