@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Lancer le quiz — QuizLive</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/launch.css">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body data-page="launch" class="launch-page">
+  <header class="launch-topbar">
+    <a href="dashboard.html?section=quizzes" class="launch-brand">⚡ <strong>QuizLive</strong></a>
+    <div class="launch-top-actions">
+      <a id="editQuizLink" class="launch-secondary" href="#">Modifier le quiz</a>
+      <button id="startQuizTop" class="btn-primary">▶ Commencer le quiz</button>
+    </div>
+  </header>
+
+  <main class="launch-shell">
+    <section class="launch-lobby">
+      <div class="launch-join-card">
+        <p class="launch-eyebrow">Rejoindre la session</p>
+        <h1 id="launchQuizName">Chargement…</h1>
+        <div class="launch-code-label">Code de la session</div>
+        <div id="launchCode" class="launch-code">------</div>
+        <div id="launchQr" class="launch-qr" aria-label="QR Code de connexion"></div>
+        <a id="joinLink" class="launch-link" href="#" target="_blank" rel="noopener"></a>
+        <button id="copyJoinLink" class="launch-secondary">Copier le lien</button>
+      </div>
+
+      <div class="launch-main-column">
+        <div class="launch-participants-card">
+          <div><span id="participantCount" class="launch-participant-number">0</span><strong>participants connectés</strong></div>
+          <div id="participantNames" class="launch-participant-names"><span>En attente des participants…</span></div>
+        </div>
+
+        <div class="launch-preview-card">
+          <div class="launch-preview-head">
+            <div><p class="launch-eyebrow">Aperçu du contenu</p><h2 id="previewTitle">Quiz</h2></div>
+            <div class="launch-preview-controls">
+              <button id="previousPreview" class="launch-secondary">←</button>
+              <span id="previewPosition">0 / 0</span>
+              <button id="nextPreview" class="launch-secondary">→</button>
+            </div>
+          </div>
+          <div id="launchPreview" class="launch-preview"><p>Aucun contenu.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="launch-sticky-bar">
+    <div><strong id="stickyCode">------</strong><span id="stickyParticipants">0 participant</span></div>
+    <button id="startQuizSticky" class="btn-primary">▶ Commencer le quiz</button>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/launch-page.js?v=37"></script>
+</body>
+</html>
