@@ -9,7 +9,7 @@ const firebaseConfig = {
 const ADMIN_UID_CONFIG = "7DEy3WkKdQgbz7Kh7KCIrScb2el2";
 
 // Instance principale : comptes organisateurs (email / mot de passe).
-const organizerApp = firebase.apps.find(app => app.name === '[DEFAULT]]') || firebase.initializeApp(firebaseConfig);
+const organizerApp = firebase.apps.find(app => app.name === '[DEFAULT]') || firebase.initializeApp(firebaseConfig);
 const organizerDatabase = organizerApp.database();
 const organizerAuth = organizerApp.auth();
 
