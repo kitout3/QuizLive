@@ -17,10 +17,10 @@ const STRIPE_PRICE_ENTERPRISE = defineString('STRIPE_PRICE_ENTERPRISE');
 const APP_URL = defineString('APP_URL', { default: 'https://kitout3.github.io/QuizLive' });
 
 const PLAN_LIMITS = Object.freeze({
-  free: 20,
-  pro: 200,
-  business: 1000,
-  enterprise: 5000
+  free: 10,
+  pro: 50,
+  business: 200,
+  enterprise: 500
 });
 
 function stripeClient() {
@@ -42,7 +42,7 @@ async function findUidByCustomer(customerId) {
 }
 
 async function writeSubscription(uid, data) {
-  const plan = PLAN_LIMITS[data.plan] ? data.plan : 'free';
+  const plan = Object.prototype.hasOwnProperty.call(PLAN_LIMITS, data.plan) ? data.plan : 'free';
   const participantLimit = PLAN_LIMITS[plan];
   const now = Date.now();
   const updates = {};
