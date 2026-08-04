@@ -77,6 +77,8 @@
       createdAt: now
     };
 
+    const queueId = database.ref('emailQueue').push().key;
+    const joinUrl = `${location.origin}${location.pathname.replace(/dashboard\.html.*$/, '')}login.html?invite=${encodeURIComponent(key)}`;
     const updates = {};
     updates[`organizationEmailInvites/${key}`] = invite;
     updates[`organizations/${context.organizationId}/pendingInvites/${key}`] = {
@@ -87,8 +89,23 @@
       status: 'pending',
       createdAt: now
     };
+    updates[`emailQueue/${queueId}`] = {
+      type: 'enterprise_invitation',
+      to: email,
+      organizationId: context.organizationId,
+      organizationName: context.organization.name || 'Entreprise',
+      groupId,
+      groupName: group.name || 'Groupe',
+      inviteKey: key,
+      joinUrl,
+      requestedBy: currentUser.uid,
+      status: 'pending',
+      createdAt: now
+    };
+
     await database.ref().update(updates);
     window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
+    return { email, queueId };
   }
 
   async function acceptInvite(user) {
@@ -150,14 +167,17 @@
     const button = form.querySelector('button[type="submit"]');
     const groupName = form.closest('.enterprise-group-card')?.querySelector('h3')?.textContent || '';
     button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    const submittedEmail = normalizeEmail(input.value);
     try {
-      await createInvite(groupName, input.value);
-      notify(`Invitation enregistrée pour ${normalizeEmail(input.value)}.`);
+      await createInvite(groupName, submittedEmail);
+      notify(`Invitation enregistrée et mise en file d’envoi pour ${submittedEmail}.`);
       input.value = '';
     } catch (error) {
       notify(error.message || 'Invitation impossible.', 'error');
     } finally {
       button.disabled = false;
+      button.removeAttribute('aria-busy');
     }
   }, true);
 
