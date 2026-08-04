@@ -59,6 +59,11 @@
       }
     },
 
+    "stripeCustomers": {
+      ".read": false,
+      ".write": false
+    },
+
     "sessionPseudos": {
       "$code": {
         ".read": "auth != null",
@@ -78,7 +83,12 @@
           ".validate": "newData.isString() && ((!data.exists() && newData.val() === auth.uid) || newData.val() === data.val())"
         },
 
+        "maxParticipants": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= (root.child('subscriptions').child(auth.uid).child('participantLimit').exists() ? root.child('subscriptions').child(auth.uid).child('participantLimit').val() : 20)"
+        },
+
         "participants": {
+          ".validate": "newData.numChildren() <= (root.child('sessions').child($code).child('maxParticipants').exists() ? root.child('sessions').child($code).child('maxParticipants').val() : 20)",
           "$participantId": {
             ".read": "auth != null",
             ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
