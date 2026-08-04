@@ -1,0 +1,14 @@
+/* QuizLive - pages d'authentification */
+.auth-page{min-height:100vh;display:flex;flex-direction:column;background:#080914;color:#fff}
+.auth-header{display:flex;align-items:center;justify-content:space-between;padding:22px 5vw;position:relative;z-index:2}
+.auth-brand,.auth-back{color:#fff;text-decoration:none;font-family:Outfit,sans-serif}
+.auth-brand{font-size:22px;font-weight:700}.auth-back{opacity:.72}
+.auth-main{position:relative;z-index:1;flex:1;display:grid;place-items:center;padding:30px 18px 60px}
+.auth-card{width:min(100%,480px);box-sizing:border-box;padding:40px;border:1px solid rgba(255,255,255,.13);border-radius:28px;background:rgba(25,26,55,.94);box-shadow:0 30px 80px rgba(0,0,0,.38)}
+.auth-card h1{font:700 40px Outfit,sans-serif;margin:0 0 10px}.auth-intro{color:rgba(255,255,255,.62);font:400 17px/1.55 Outfit,sans-serif;margin:0 0 26px}
+.auth-google,.auth-submit{width:100%;min-height:58px;border:0;border-radius:16px;font:700 17px Outfit,sans-serif;cursor:pointer}.auth-google{background:#fff;color:#202124}.auth-submit{background:linear-gradient(135deg,#6658f5,#dd42ae);color:#fff;margin-top:6px}
+.auth-separator{display:flex;align-items:center;gap:14px;margin:24px 0;color:rgba(255,255,255,.45)}.auth-separator:before,.auth-separator:after{content:"";height:1px;background:rgba(255,255,255,.12);flex:1}
+.auth-field{margin-bottom:18px}.auth-field label{display:block;margin-bottom:8px;color:rgba(255,255,255,.78);font:600 15px Outfit,sans-serif}.auth-field input{box-sizing:border-box;width:100%;min-height:58px;border:1px solid rgba(255,255,255,.13);border-radius:16px;background:rgba(255,255,255,.035);color:#fff;padding:0 18px;font:500 16px Outfit,sans-serif;outline:none}.auth-field input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.17)}
+.auth-password-wrap{position:relative}.auth-password-wrap input{padding-right:58px}.auth-eye{position:absolute;right:9px;top:8px;width:42px;height:42px;border:0;border-radius:12px;background:transparent;color:#fff;font-size:20px;cursor:pointer}
+.auth-error,.auth-success{min-height:24px;margin:10px 0;font:500 14px/1.45 Outfit,sans-serif}.auth-error{color:#fca5a5}.auth-success{color:#86efac}.auth-links{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 18px;margin-top:22px;font:500 14px Outfit,sans-serif}.auth-links a{color:rgba(255,255,255,.72);text-decoration:none}.auth-submit:disabled,.auth-google:disabled{opacity:.6;cursor:wait}
+@media(max-width:520px){.auth-header{padding:18px}.auth-card{border-radius:22px;padding:28px 22px}.auth-card h1{font-size:34px}.auth-main{align-items:start;padding-top:24px}}
