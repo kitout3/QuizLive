@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuizLive - Jouer</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=76">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body data-page="player">
     <div class="background-effects"><div class="gradient-orb orb-1"></div><div class="gradient-orb orb-2"></div><div class="gradient-orb orb-3"></div><div class="grid-overlay"></div></div>
-    <header class="main-header"><div class="logo"><span class="logo-icon">⚡</span><a href="index.html?v=61" class="logo-text" style="text-decoration:none">QuizLive</a></div><div class="player-score-display"><span class="score-label">Score:</span><span id="playerScore" class="score-value">0</span></div><button class="btn-home" onclick="goToHome()" title="Retour à l'accueil">🏠</button></header>
+    <header class="main-header"><div class="logo"><span class="logo-icon">⚡</span><a href="index.html?v=76" class="logo-text" style="text-decoration:none">QuizLive</a></div><div class="player-score-display"><span class="score-label">Score:</span><span id="playerScore" class="score-value">0</span></div><button class="btn-home" onclick="goToHome()" title="Retour à l'accueil">🏠</button></header>
     <main class="player-container"><div class="player-header"><p style="color:var(--text-secondary)">Bienvenue, <strong id="playerName">Joueur</strong> !</p></div><div id="playerContent"><div class="waiting-screen"><div class="waiting-icon">⏳</div><div class="waiting-text">Connexion au quiz...</div></div></div></main>
     <div id="joinViaQRModal" class="modal"><div class="modal-content" style="max-width:400px"><h2 style="text-align:center;margin-bottom:24px">🚀 Rejoindre le Quiz</h2><form id="joinViaQRForm" onsubmit="joinViaQR(event)"><div class="form-group"><label>Code de la session</label><input type="text" id="qrSessionCode" readonly style="text-transform:uppercase;background:rgba(255,255,255,.05)"></div><div class="form-group"><label>Votre pseudo</label><input type="text" id="qrPlayerName" maxlength="30" required autofocus></div><button type="submit" class="btn-primary" style="width:100%">🎯 Participer</button></form></div></div>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="js/config.js?v=61"></script><script src="js/app.js?v=61"></script><script src="js/player-runtime-v3.js?v=61"></script><script src="js/participant-join-v3.js?v=61"></script>
+    <script src="js/config.js?v=76"></script><script src="js/app.js?v=76"></script><script src="js/player-runtime-v3.js?v=76"></script><script src="js/participant-join-v3.js?v=76"></script>
 </body>
 </html>
