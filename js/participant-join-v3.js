@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.0.0';
+  const VERSION = '3.1.0';
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -34,14 +34,23 @@
     const auth = firebase.auth();
     await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
-    const current = auth.currentUser;
-    if (current?.isAnonymous) return current;
+    const tabUid = sessionStorage.getItem('quizliveParticipantUid');
+    let current = auth.currentUser;
+
     if (current && !current.isAnonymous) {
       throw new Error('Ce navigateur est connecté comme organisateur. Ouvrez le lien participant dans une fenêtre privée ou sur un autre appareil.');
     }
 
+    // Un nouvel onglet de test doit obtenir sa propre identité participante.
+    if (current?.isAnonymous && tabUid && current.uid === tabUid) return current;
+    if (current?.isAnonymous && (!tabUid || current.uid !== tabUid)) {
+      await auth.signOut();
+      current = null;
+    }
+
     const credential = await auth.signInAnonymously();
     if (!credential?.user?.uid) throw new Error('Firebase n’a pas créé de compte participant anonyme.');
+    sessionStorage.setItem('quizliveParticipantUid', credential.user.uid);
     return credential.user;
   }
 
@@ -96,8 +105,7 @@
         connected: true
       });
 
-      step = 'sauvegarde locale';
-      localStorage.setItem('quizSession', JSON.stringify({
+      const sessionData = {
         code,
         isAdmin: false,
         participantId: user.uid,
@@ -105,7 +113,11 @@
         playerId: user.uid,
         name,
         joinVersion: VERSION
-      }));
+      };
+
+      step = 'sauvegarde locale';
+      sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
+      localStorage.setItem('quizSession', JSON.stringify(sessionData));
 
       window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=56`);
     } catch (error) {
