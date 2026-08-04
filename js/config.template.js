@@ -34,34 +34,34 @@ window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
     try {
         await loadQuizModule('https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js');
-        await loadQuizModule('js/organizer-auth.js?v=31');
-        await loadQuizModule('js/mobile-google-auth.js?v=31');
-        await loadQuizModule('js/platform-features.js?v=31');
-        await loadQuizModule('js/billing.js?v=31');
+        await loadQuizModule('js/organizer-auth.js?v=36');
+        await loadQuizModule('js/mobile-google-auth.js?v=36');
+        await loadQuizModule('js/platform-features.js?v=36');
+        await loadQuizModule('js/billing.js?v=36');
 
         if (document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/home-role-flow.js?v=31');
-            await loadQuizModule('js/auth-page-navigation.js?v=31');
+            await loadQuizModule('js/home-role-flow.js?v=36');
+            await loadQuizModule('js/auth-page-navigation.js?v=36');
         }
 
-        await loadQuizModule('js/billing-dashboard-only.js?v=31');
-        await loadQuizModule('js/auth-ux-fix.js?v=31');
-        await loadQuizModule('js/password-toggle.js?v=31');
+        await loadQuizModule('js/billing-dashboard-only.js?v=36');
+        await loadQuizModule('js/auth-ux-fix.js?v=36');
+        await loadQuizModule('js/password-toggle.js?v=36');
 
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=31');
-            await loadQuizModule('js/participant-guard.js?v=31');
+            await loadQuizModule('js/player-session-auth.js?v=36');
+            await loadQuizModule('js/participant-guard.js?v=36');
         }
         if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=31');
+            await loadQuizModule('js/speed-scoring.js?v=36');
         }
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=31');
-            await loadQuizModule('js/pptx-import.js?v=31');
-            await loadQuizModule('js/ai-question-generator.js?v=31');
+            await loadQuizModule('js/participant-guard.js?v=36');
+            await loadQuizModule('js/pptx-import.js?v=36');
+            await loadQuizModule('js/ai-question-generator.js?v=36');
         }
 
-        await loadQuizModule('js/unified-runtime.js?v=31');
+        await loadQuizModule('js/unified-runtime.js?v=36');
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
     }
