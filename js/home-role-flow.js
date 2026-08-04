@@ -1,81 +1,58 @@
-// QuizLive - parcours d'accueil Organisateur / Participant
+// QuizLive - accueil simplifié : organiser ou rejoindre directement
 (() => {
   'use strict';
   if (!document.body.classList.contains('home-page')) return;
 
   const cards = document.querySelector('.action-cards');
   if (!cards) return;
-  let selectedRole = null;
-
-  const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc = value => String(value || '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
   function card(icon, title, text, action) {
     return `<button type="button" class="action-card" data-action="${action}" style="text-align:left;width:100%;color:inherit"><div class="card-icon">${icon}</div><h3>${title}</h3><p>${text}</p><div class="card-arrow">→</div></button>`;
   }
 
-  function bindActions() {
-    cards.querySelectorAll('[data-action]').forEach(element => element.onclick = () => handleAction(element.dataset.action));
-  }
-
   async function isOrganizer(user) {
     if (!user || user.isAnonymous) return false;
-    return window.QuizOrganizer?.ensureOrganizer ? window.QuizOrganizer.ensureOrganizer(user) : true;
-  }
-
-  function renderRoleChoice() {
-    selectedRole = null;
-    cards.innerHTML = card('🧑‍💼', 'Organisateur', 'Créer, administrer et analyser vos quiz', 'organizer') + card('🚀', 'Participant', 'Rejoindre une partie avec un code à 6 chiffres', 'participant');
-    bindActions();
-  }
-
-  function renderParticipant() {
-    selectedRole = 'participant';
-    cards.innerHTML = card('🚀', 'Rejoindre un quiz', 'Saisissez le code communiqué par l’organisateur', 'join') + card('←', 'Changer de profil', 'Retour au choix Organisateur / Participant', 'back');
-    bindActions();
-  }
-
-  async function renderOrganizer() {
-    selectedRole = 'organizer';
-    const user = firebase.auth().currentUser;
-    if (await isOrganizer(user)) {
-      cards.innerHTML = card('🎯', 'Créer un quiz', 'Lancer une nouvelle session sans vous reconnecter', 'createQuiz') + card('📊', 'Mon espace', 'Quiz, statistiques, organisation et abonnement', 'dashboard') + card('↪', 'Se déconnecter', `Compte connecté : ${esc(user.email || user.displayName || '')}`, 'logout') + card('←', 'Changer de profil', 'Retour au choix Organisateur / Participant', 'back');
-    } else {
-      cards.innerHTML = card('🔐', 'Se connecter', 'Google ou adresse email et mot de passe', 'login') + card('✨', 'Créer un compte', 'Google ou nom, email et mot de passe', 'signup') + card('←', 'Changer de profil', 'Retour au choix Organisateur / Participant', 'back');
+    try {
+      return window.QuizOrganizer?.ensureOrganizer ? Boolean(await window.QuizOrganizer.ensureOrganizer(user)) : true;
+    } catch (_) {
+      return false;
     }
-    bindActions();
   }
 
-  function openCreateQuiz() {
-    if (typeof showCreateModal !== 'function') return;
-    showCreateModal();
-    setTimeout(() => {
-      const loginStep = document.getElementById('adminLoginStep');
-      const createStep = document.getElementById('createSessionStep');
-      if (loginStep) loginStep.style.display = 'none';
-      if (createStep) createStep.style.display = 'block';
-    }, 0);
+  async function renderHome() {
+    const user = firebase.auth().currentUser;
+    const connected = await isOrganizer(user);
+    cards.innerHTML = connected ? [
+      card('🎯', 'Créer un quiz', 'Construisez un nouveau quiz dans l’éditeur', 'create'),
+      card('🚀', 'Rejoindre une session', 'Entrez directement un code de session à 6 caractères', 'join'),
+      card('📊', 'Mon espace', 'Retrouvez vos quiz, statistiques et paramètres', 'dashboard'),
+      card('↪', 'Se déconnecter', `Compte connecté : ${esc(user.email || user.displayName || '')}`, 'logout')
+    ].join('') : [
+      card('🔐', 'Se connecter', 'Accédez à votre espace organisateur', 'login'),
+      card('✨', 'Créer un compte', 'Créez votre compte organisateur', 'register'),
+      card('🚀', 'Rejoindre une session', 'Entrez directement un code de session à 6 caractères', 'join')
+    ].join('');
+
+    cards.querySelectorAll('[data-action]').forEach(button => {
+      button.onclick = () => handleAction(button.dataset.action);
+    });
   }
 
   async function handleAction(action) {
-    if (action === 'organizer') return renderOrganizer();
-    if (action === 'participant') return renderParticipant();
-    if (action === 'back') return renderRoleChoice();
-    if (action === 'join') return showJoinModal();
-    if (action === 'login') return location.assign('login.html');
-    if (action === 'signup') return location.assign('register.html');
-    if (action === 'createQuiz') return openCreateQuiz();
+    if (action === 'login') return location.assign('login.html?return=dashboard.html');
+    if (action === 'register') return location.assign('register.html?return=dashboard.html');
+    if (action === 'join') return typeof window.showJoinModal === 'function' ? window.showJoinModal() : null;
     if (action === 'dashboard') return location.assign('dashboard.html');
+    if (action === 'create') return location.assign('editor.html');
     if (action === 'logout') {
       await firebase.auth().signOut();
       localStorage.removeItem('organizerUid');
       localStorage.removeItem('organizerEmail');
-      return renderOrganizer();
+      return renderHome();
     }
   }
 
-  firebase.auth().onAuthStateChanged(() => {
-    if (selectedRole === 'organizer') renderOrganizer();
-  });
-
-  renderRoleChoice();
+  firebase.auth().onAuthStateChanged(() => renderHome());
+  renderHome();
 })();
