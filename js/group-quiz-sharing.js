@@ -21,22 +21,30 @@
       const profile = profileSnap.val() || {};
       const links = linksSnap.val() || {};
       const organizationId = profile.defaultOrganizationId || Object.keys(links)[0] || '';
-      if (!organizationId) return { organizationId: '', organization: {}, membership: {}, groups: [] };
+      if (!organizationId) return { organizationId: '', organization: {}, membership: {}, groups: [], isOwner: false };
 
-      const [organizationSnap, membershipSnap, groupsSnap] = await Promise.all([
+      const [organizationSnap, membershipSnap, groupsSnap, groupMembersSnap] = await Promise.all([
         database.ref(`organizations/${organizationId}`).once('value'),
         database.ref(`organizationMembers/${organizationId}/${currentUser.uid}`).once('value'),
-        database.ref(`organizationGroups/${organizationId}`).once('value')
+        database.ref(`organizationGroups/${organizationId}`).once('value'),
+        database.ref(`organizationGroupMembers/${organizationId}`).once('value')
       ]);
 
       const organization = organizationSnap.val() || {};
       const membership = membershipSnap.val() || {};
       const allGroups = Object.entries(groupsSnap.val() || {}).map(([id, value]) => ({ id, ...value }));
+      const groupMemberTree = groupMembersSnap.val() || {};
       const isOwner = organization.ownerUid === currentUser.uid;
-      const groups = isOwner
-        ? allGroups
-        : allGroups.filter(group => membership.groupIds?.[group.id] === true);
 
+      const accessibleGroupIds = new Set(Object.keys(membership.groupIds || {}).filter(id => membership.groupIds[id] === true));
+      Object.entries(groupMemberTree).forEach(([groupId, members]) => {
+        if (members && members[currentUser.uid]) accessibleGroupIds.add(groupId);
+      });
+
+      const linkedGroupId = links[organizationId]?.groupId;
+      if (linkedGroupId) accessibleGroupIds.add(linkedGroupId);
+
+      const groups = isOwner ? allGroups : allGroups.filter(group => accessibleGroupIds.has(group.id));
       return { organizationId, organization, membership, groups, isOwner };
     })();
 
@@ -54,23 +62,38 @@
       const submit = form.querySelector('button[type="submit"]');
       const box = document.createElement('div');
       box.className = 'form-group';
+
+      const privateOption = context.isOwner
+        ? '<option value="">Quiz personnel — visible uniquement par moi</option>'
+        : '';
+
       box.innerHTML = `
         <label for="quizGroupId">Groupe de visibilité</label>
-        <select id="quizGroupId">
-          <option value="">Quiz personnel — visible uniquement par moi</option>
+        <select id="quizGroupId" required>
+          ${privateOption}
           ${context.groups.map(group => `<option value="${esc(group.id)}">${esc(group.name)}</option>`).join('')}
         </select>
-        <small style="display:block;margin-top:7px;opacity:.72">Un quiz attribué à un groupe sera visible par tous ses membres.</small>`;
+        <small style="display:block;margin-top:7px;opacity:.72">Tous les membres de ce groupe verront et pourront ouvrir ce quiz.</small>`;
       form.insertBefore(box, submit);
+
+      if (!context.isOwner && context.groups.length) {
+        box.querySelector('select').value = context.groups[0].id;
+      }
     } catch (error) {
       console.warn('Sélecteur de groupe indisponible :', error);
     }
   }
 
   async function selectedGroupContext() {
-    const groupId = document.getElementById('quizGroupId')?.value || '';
-    if (!groupId) return null;
     const context = await loadContext();
+    const selector = document.getElementById('quizGroupId');
+    let groupId = selector?.value || '';
+
+    if (!groupId && !context.isOwner && context.groups.length === 1) {
+      groupId = context.groups[0].id;
+    }
+    if (!groupId) return null;
+
     const group = context.groups.find(item => item.id === groupId);
     if (!group) throw new Error('Vous n’avez pas accès à ce groupe.');
     return {
@@ -79,6 +102,39 @@
       groupId: group.id,
       groupName: group.name || 'Groupe'
     };
+  }
+
+  async function rebuildMissingGroupIndex(context, indexedSessions) {
+    const allSessionsSnap = await database.ref('sessions').once('value');
+    const allSessions = allSessionsSnap.val() || {};
+    const indexedCodes = new Set(indexedSessions.map(item => item.code));
+    const accessibleIds = new Set(context.groups.map(group => group.id));
+    const missing = [];
+    const updates = {};
+
+    Object.entries(allSessions).forEach(([code, session]) => {
+      if (!session || session.organizationId !== context.organizationId || !accessibleIds.has(session.groupId)) return;
+      if (indexedCodes.has(code)) return;
+
+      const group = context.groups.find(item => item.id === session.groupId);
+      const summary = {
+        code,
+        name: session.name || code,
+        ownerUid: session.ownerUid || '',
+        ownerEmail: session.ownerEmail || '',
+        status: session.status || 'waiting',
+        createdAt: Number(session.createdAt || Date.now()),
+        updatedAt: Number(session.updatedAt || session.createdAt || Date.now())
+      };
+
+      missing.push({ ...summary, groupId: session.groupId, groupName: session.groupName || group?.name || 'Groupe' });
+      updates[`groupSessions/${context.organizationId}/${session.groupId}/${code}`] = summary;
+    });
+
+    if (Object.keys(updates).length) {
+      database.ref().update(updates).catch(error => console.warn('Réparation index groupe impossible :', error));
+    }
+    return missing;
   }
 
   async function loadGroupSessions() {
@@ -97,8 +153,11 @@
       });
     });
 
-    sessions.sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
-    return { context, sessions };
+    const repaired = await rebuildMissingGroupIndex(context, sessions);
+    const combined = [...sessions, ...repaired];
+    const unique = Array.from(new Map(combined.map(item => [item.code, item])).values());
+    unique.sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+    return { context, sessions: unique };
   }
 
   async function assignSession(code, groupId) {
@@ -113,10 +172,7 @@
 
     const now = firebase.database.ServerValue.TIMESTAMP;
     const updates = {};
-
-    if (session.organizationId && session.groupId) {
-      updates[`groupSessions/${session.organizationId}/${session.groupId}/${code}`] = null;
-    }
+    if (session.organizationId && session.groupId) updates[`groupSessions/${session.organizationId}/${session.groupId}/${code}`] = null;
 
     updates[`sessions/${code}/organizationId`] = context.organizationId;
     updates[`sessions/${code}/organizationName`] = context.organization.name || 'Entreprise';
@@ -130,12 +186,11 @@
       code,
       name: session.name || code,
       ownerUid: session.ownerUid || currentUser.uid,
-      ownerEmail: currentUser.email || '',
+      ownerEmail: session.ownerEmail || currentUser.email || '',
       status: session.status || 'waiting',
-      createdAt: session.createdAt || now,
+      createdAt: Number(session.createdAt || Date.now()),
       updatedAt: now
     };
-
     await database.ref().update(updates);
   }
 
@@ -179,7 +234,7 @@
       const assignment = document.createElement('article');
       assignment.id = 'groupAssignQuizzes';
       assignment.className = 'dashboard-card';
-      assignment.innerHTML = `
+      assignment.innerHTML = context.isOwner ? `
         <h2>Attribuer mes quiz à un groupe</h2>
         <p class="dashboard-muted">Choisis le groupe qui pourra voir et utiliser chaque quiz.</p>
         ${personalRows.length ? personalRows.map(row => {
@@ -187,16 +242,16 @@
           const code = new URL(link.href).searchParams.get('code') || '';
           const name = row.querySelector('strong')?.textContent || code;
           return `<div class="dashboard-row" data-group-assign-row="${esc(code)}"><div><strong>${esc(name)}</strong><div class="dashboard-muted">${esc(code)}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select data-assign-code="${esc(code)}"><option value="">Choisir un groupe</option>${context.groups.map(group => `<option value="${esc(group.id)}">${esc(group.name)}</option>`).join('')}</select><button type="button" class="btn-primary" data-apply-group="${esc(code)}">Attribuer</button><button type="button" data-remove-group="${esc(code)}">Privé</button></div></div>`;
-        }).join('') : '<p class="dashboard-muted">Aucun quiz personnel à attribuer.</p>'}`;
+        }).join('') : '<p class="dashboard-muted">Aucun quiz personnel à attribuer.</p>'}` : '';
 
       const shared = document.createElement('article');
       shared.id = 'groupSharedQuizzes';
       shared.className = 'dashboard-card';
       shared.innerHTML = `
-        <div class="dashboard-row"><div><h2 style="margin:0">Quiz partagés dans mes groupes</h2><p class="dashboard-muted">Tous les membres du groupe voient les mêmes quiz.</p></div><a class="btn-primary" href="index.html?create=1">+ Créer un quiz</a></div>
-        ${sessions.length ? sessions.map(session => `<div class="dashboard-row"><div><strong>${esc(session.name || session.code)}</strong><div class="dashboard-muted">${esc(session.groupName)} · ${esc(session.code)} · ${esc(session.status || 'waiting')}</div></div><a class="btn-primary" href="admin.html?code=${encodeURIComponent(session.code)}">Ouvrir</a></div>`).join('') : '<p class="dashboard-muted">Aucun quiz partagé dans vos groupes.</p>'}`;
+        <div class="dashboard-row"><div><h2 style="margin:0">Quiz partagés dans mes groupes</h2><p class="dashboard-muted">Tous les membres du groupe voient les mêmes quiz, quel que soit leur créateur.</p></div><a class="btn-primary" href="index.html?create=1">+ Créer un quiz</a></div>
+        ${sessions.length ? sessions.map(session => `<div class="dashboard-row"><div><strong>${esc(session.name || session.code)}</strong><div class="dashboard-muted">${esc(session.groupName)} · ${esc(session.code)} · créé par ${esc(session.ownerEmail || 'un membre')}</div></div><a class="btn-primary" href="admin.html?code=${encodeURIComponent(session.code)}">Ouvrir</a></div>`).join('') : '<p class="dashboard-muted">Aucun quiz partagé dans vos groupes.</p>'}`;
 
-      content.appendChild(assignment);
+      if (context.isOwner) content.appendChild(assignment);
       content.appendChild(shared);
 
       assignment.querySelectorAll('[data-apply-group]').forEach(button => {
@@ -208,6 +263,7 @@
           try {
             await assignSession(code, select.value);
             notify('Quiz attribué au groupe.');
+            rendering = false;
             await renderDashboardGroupQuizzes();
           } catch (error) {
             notify(error.message || 'Attribution impossible.', 'error');
@@ -223,6 +279,7 @@
           try {
             await removeAssignment(button.dataset.removeGroup);
             notify('Quiz redevenu personnel.');
+            rendering = false;
             await renderDashboardGroupQuizzes();
           } catch (error) {
             notify(error.message || 'Modification impossible.', 'error');
@@ -233,6 +290,7 @@
       });
     } catch (error) {
       console.warn('Quiz de groupe indisponibles :', error);
+      notify(error.message || 'Impossible de charger les quiz du groupe.', 'error');
     } finally {
       rendering = false;
     }
@@ -252,7 +310,7 @@
   });
 
   document.addEventListener('click', event => {
-    if (event.target.closest('[data-section="quizzes"]')) setTimeout(renderDashboardGroupQuizzes, 100);
+    if (event.target.closest('[data-section="quizzes"]')) setTimeout(renderDashboardGroupQuizzes, 120);
   });
 
   window.QuizLiveGroupSharing = {
