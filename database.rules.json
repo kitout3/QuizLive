@@ -67,6 +67,14 @@
       }
     },
 
+    "emailQueue": {
+      "$queueId": {
+        ".read": "auth != null && data.child('requestedBy').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('requestedBy').val() === auth.uid && newData.child('status').val() === 'pending' && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid) || (data.exists() && data.child('requestedBy').val() === auth.uid && !newData.exists()))",
+        ".validate": "!newData.exists() || (newData.hasChildren(['type','to','organizationId','organizationName','groupId','groupName','inviteKey','joinUrl','requestedBy','status','createdAt']) && newData.child('type').val() === 'enterprise_invitation' && newData.child('to').isString() && newData.child('to').val().length <= 320 && newData.child('requestedBy').val() === auth.uid && newData.child('status').val() === 'pending')"
+      }
+    },
+
     "userOrganizations": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
