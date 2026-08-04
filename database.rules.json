@@ -22,7 +22,7 @@
     "organizationMembers": {
       "$organizationId": {
         ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
-        ".validate": "newData.numChildren() <= 3",
+        ".validate": "newData.numChildren() <= 4",
         "$uid": {
           ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || (auth.uid === $uid && !data.exists()))"
         }
