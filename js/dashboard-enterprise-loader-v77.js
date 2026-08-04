@@ -3,6 +3,7 @@
   'use strict';
 
   const auth = window.QuizLiveFirebase?.organizerAuth || firebase.auth();
+  const db = window.QuizLiveFirebase?.organizerDatabase || database;
   let loaded = false;
 
   function redirectToOverview() {
@@ -62,6 +63,17 @@
     if (!visible) {
       redirectToOverview();
       return;
+    }
+
+    try {
+      await db.ref(`organizers/${user.uid}`).update({
+        plan: 'enterprise',
+        enterpriseMember: true,
+        defaultOrganizationId: entitlements.organizationId,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    } catch (error) {
+      console.warn('Synchronisation du profil Enterprise impossible :', error);
     }
 
     await loadEnterpriseModules();
