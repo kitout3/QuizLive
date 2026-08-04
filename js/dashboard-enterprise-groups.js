@@ -7,9 +7,9 @@
   const sidebar = document.getElementById('dashboardSidebar');
   if (!content || !title || !subtitle) return;
 
-  const MAX_ACCOUNTS = 3;
+  const MAX_ACCOUNTS = 4;
   const MAX_GROUPS = 3;
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const clean = (value, max = 120) => String(value || '').trim().replace(/[<>"'&]/g, '').slice(0, max);
   let user = null;
 
@@ -131,7 +131,7 @@
     const selectedId = profileData.defaultOrganizationId || orgs[0]?.id || '';
 
     if (plan !== 'enterprise') {
-      content.innerHTML = `<article class="dashboard-card enterprise-gate"><span>🏢</span><h2>Espace entreprise</h2><p>La gestion de groupes et des accès collaborateurs est disponible avec l’offre Enterprise.</p><p><strong>Enterprise : 50 €/mois · 500 participants · 3 comptes · 3 groupes</strong></p><button type="button" class="btn-primary" id="enterpriseBillingBtn">Voir l’abonnement Enterprise</button></article><article class="dashboard-card"><h2>Rejoindre une entreprise</h2><form id="joinEnterpriseForm" class="enterprise-inline-form"><input id="enterpriseInviteCode" maxlength="12" placeholder="Code d’invitation" required><button class="btn-primary">Rejoindre</button></form></article>`;
+      content.innerHTML = `<article class="dashboard-card enterprise-gate"><span>🏢</span><h2>Espace entreprise</h2><p>La gestion de groupes et des accès collaborateurs est disponible avec l’offre Enterprise.</p><p><strong>Enterprise : 50 €/mois · 500 participants · 4 comptes · 3 groupes</strong></p><button type="button" class="btn-primary" id="enterpriseBillingBtn">Voir l’abonnement Enterprise</button></article><article class="dashboard-card"><h2>Rejoindre une entreprise</h2><form id="joinEnterpriseForm" class="enterprise-inline-form"><input id="enterpriseInviteCode" maxlength="12" placeholder="Code d’invitation" required><button class="btn-primary">Rejoindre</button></form></article>`;
       document.getElementById('enterpriseBillingBtn').onclick = () => location.assign('dashboard.html?section=billing');
       document.getElementById('joinEnterpriseForm').onsubmit = async event => { event.preventDefault(); try { await acceptInvite(document.getElementById('enterpriseInviteCode').value); notify('Vous avez rejoint le groupe.'); renderOrganization(); } catch (error) { notify(error.message, 'error'); } };
       return;
