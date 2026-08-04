@@ -24,8 +24,8 @@
         ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid)",
         "pendingInvites": {
           "$emailKey": {
-            ".read": "auth != null && root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid",
-            ".write": "auth != null && root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid"
+            ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || (auth.token.email != null && data.child('email').val() === auth.token.email))",
+            ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || (auth.token.email != null && data.child('email').val() === auth.token.email && !newData.exists()))"
           }
         }
       }
