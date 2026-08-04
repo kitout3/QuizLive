@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Mon espace — QuizLive</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body data-page="dashboard" class="dashboard-page">
+  <div class="dashboard-shell">
+    <aside class="dashboard-sidebar" id="dashboardSidebar">
+      <a class="dashboard-brand" href="index.html"><span>⚡</span><strong>QuizLive</strong></a>
+      <nav class="dashboard-nav" aria-label="Navigation organisateur">
+        <button class="dashboard-nav-item active" data-section="overview">📊 Vue d’ensemble</button>
+        <button class="dashboard-nav-item" data-section="quizzes">📚 Mes quiz</button>
+        <button class="dashboard-nav-item" data-section="organization">🏢 Organisation</button>
+        <button class="dashboard-nav-item" data-section="billing">💳 Abonnement</button>
+        <button class="dashboard-nav-item" data-section="profile">👤 Mon profil</button>
+      </nav>
+      <div class="dashboard-sidebar-bottom">
+        <a class="dashboard-nav-item" href="index.html">← Retour à l’accueil</a>
+        <button class="dashboard-nav-item danger" id="dashboardLogout">↪ Se déconnecter</button>
+      </div>
+    </aside>
+
+    <main class="dashboard-main">
+      <header class="dashboard-topbar">
+        <button class="dashboard-menu-button" id="dashboardMenuButton" aria-label="Ouvrir le menu">☰</button>
+        <div><h1 id="dashboardTitle">Vue d’ensemble</h1><p id="dashboardSubtitle">Gérez vos quiz et votre compte organisateur.</p></div>
+        <a class="btn-primary dashboard-create" href="index.html?create=1">+ Créer un quiz</a>
+      </header>
+      <section id="dashboardContent" class="dashboard-content"><div class="dashboard-loading">Chargement de votre espace…</div></section>
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/dashboard-page.js?v=31"></script>
+</body>
+</html>
