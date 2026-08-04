@@ -6,8 +6,7 @@
     "organizers": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        ".validate": "!newData.exists() || (newData.hasChildren(['uid','email','role','active']) && newData.child('uid').val() === $uid && newData.child('email').isString() && newData.child('role').val() === 'organizer' && newData.child('active').isBoolean())"
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
 
@@ -21,7 +20,7 @@
     "organizations": {
       "$organizationId": {
         ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).exists())",
-        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid))",
         "pendingInvites": {
           "$emailKey": {
             ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || (auth.token.email != null && data.child('email').val() === auth.token.email))",
@@ -67,14 +66,6 @@
       }
     },
 
-    "emailQueue": {
-      "$queueId": {
-        ".read": "auth != null && data.child('requestedBy').val() === auth.uid",
-        ".write": "auth != null && ((!data.exists() && newData.child('requestedBy').val() === auth.uid && newData.child('status').val() === 'pending' && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid) || (data.exists() && data.child('requestedBy').val() === auth.uid && !newData.exists()))",
-        ".validate": "!newData.exists() || (newData.hasChildren(['type','to','organizationId','organizationName','groupId','groupName','inviteKey','joinUrl','requestedBy','status','createdAt']) && newData.child('type').val() === 'enterprise_invitation' && newData.child('to').isString() && newData.child('to').val().length <= 320 && newData.child('requestedBy').val() === auth.uid && newData.child('status').val() === 'pending')"
-      }
-    },
-
     "userOrganizations": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -88,6 +79,18 @@
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "groupSessions": {
+      "$organizationId": {
+        "$groupId": {
+          ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
+          "$code": {
+            ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
+            ".validate": "!newData.exists() || (newData.hasChildren(['code','name','ownerUid','status','createdAt','updatedAt']) && newData.child('code').val() === $code && newData.child('name').isString() && newData.child('name').val().length <= 120 && newData.child('ownerUid').isString() && newData.child('status').isString() && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber())"
+          }
+        }
       }
     },
 
@@ -105,43 +108,57 @@
       }
     },
 
+    "sessionPseudos": {
+      "$code": {
+        ".read": true,
+        "$pseudoKey": {
+          ".write": true
+        }
+      }
+    },
+
     "sessions": {
       "$code": {
         ".read": true,
-        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && root.child('organizers').child(auth.uid).child('active').val() === true) || (data.exists() && data.child('ownerUid').val() === auth.uid))",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.exists() && (data.child('ownerUid').val() === auth.uid || (data.child('organizationId').isString() && data.child('groupId').isString() && root.child('organizationGroupMembers').child(data.child('organizationId').val()).child(data.child('groupId').val()).child(auth.uid).exists()) || (data.child('organizationId').isString() && root.child('organizations').child(data.child('organizationId').val()).child('ownerUid').val() === auth.uid))))",
 
         "participants": {
           "$participantId": {
-            ".write": "($participantId.matches(/^p_[A-Za-z0-9]{20,80}$/)) && ((!data.exists() && newData.child('id').val() === $participantId) || (data.exists() && data.child('id').val() === $participantId && newData.child('id').val() === $participantId))",
+            ".read": true,
+            ".write": true,
             ".validate": "!newData.exists() || (newData.hasChildren(['id','name','joinedAt']) && newData.child('id').val() === $participantId && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30 && newData.child('joinedAt').isNumber())",
-
             "answers": {
               "$questionIndex": {
-                ".validate": "newData.isNumber() || newData.isString() || newData.isBoolean() || newData.hasChildren()"
+                ".write": true
               }
             },
             "answerTimes": {
               "$questionIndex": {
-                ".validate": "newData.isNumber() && newData.val() >= 0"
+                ".write": true
               }
             },
             "answerPoints": {
               "$questionIndex": {
-                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+                ".write": true
               }
             },
             "score": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
-            },
-            "lastSeenAt": {
-              ".validate": "newData.isNumber()"
+              ".write": true
             },
             "connected": {
-              ".validate": "newData.isBoolean()"
+              ".write": true
+            },
+            "lastSeenAt": {
+              ".write": true
             }
           }
         }
       }
+    },
+
+    "emailQueue": {
+      ".read": false,
+      ".write": false
     },
 
     "stripeCustomers": {
