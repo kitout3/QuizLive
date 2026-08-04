@@ -97,53 +97,38 @@
       }
     },
 
-    "sessionPseudos": {
-      "$code": {
-        ".read": "auth != null",
-        "$pseudoKey": {
-          ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
-          ".validate": "!newData.exists() || (newData.hasChildren(['uid','name','normalized','reservedAt']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30 && newData.child('normalized').isString() && newData.child('reservedAt').isNumber())"
-        }
-      }
-    },
-
     "sessions": {
       "$code": {
-        ".read": "auth != null",
+        ".read": true,
         ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && root.child('organizers').child(auth.uid).child('active').val() === true) || (data.exists() && data.child('ownerUid').val() === auth.uid))",
 
         "participants": {
           "$participantId": {
-            ".read": "auth != null",
-            ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
+            ".write": "($participantId.matches(/^p_[A-Za-z0-9]{20,80}$/)) && ((!data.exists() && newData.child('id').val() === $participantId) || (data.exists() && data.child('id').val() === $participantId && newData.child('id').val() === $participantId))",
             ".validate": "!newData.exists() || (newData.hasChildren(['id','name','joinedAt']) && newData.child('id').val() === $participantId && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30 && newData.child('joinedAt').isNumber())",
 
             "answers": {
               "$questionIndex": {
-                ".write": "auth != null && auth.uid === $participantId && !data.exists()"
+                ".validate": "newData.isNumber() || newData.isString() || newData.isBoolean() || newData.hasChildren()"
               }
             },
             "answerTimes": {
               "$questionIndex": {
-                ".write": "auth != null && auth.uid === $participantId"
+                ".validate": "newData.isNumber() && newData.val() >= 0"
               }
             },
             "answerPoints": {
               "$questionIndex": {
-                ".write": "auth != null && auth.uid === $participantId",
                 ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
               }
             },
             "score": {
-              ".write": "auth != null && auth.uid === $participantId",
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
             },
             "lastSeenAt": {
-              ".write": "auth != null && auth.uid === $participantId",
               ".validate": "newData.isNumber()"
             },
             "connected": {
-              ".write": "auth != null && auth.uid === $participantId",
               ".validate": "newData.isBoolean()"
             }
           }
