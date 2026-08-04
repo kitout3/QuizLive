@@ -10,14 +10,12 @@ const firebaseConfig = {
 };
 
 window.QUIZLIVE_FIREBASE_CONFIG = firebaseConfig;
-
 const ADMIN_UID_CONFIG = localStorage.getItem('organizerUid') || "%%FIREBASE_ADMIN_UID%%";
 const PPTX_CONVERTER_URL_CONFIG = "%%PPTX_CONVERTER_URL%%";
 window.PPTX_CONVERTER_URL_CONFIG = PPTX_CONVERTER_URL_CONFIG;
 
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
-
 const tabQuizSession = sessionStorage.getItem('quizSession');
 if (tabQuizSession) localStorage.setItem('quizSession', tabQuizSession);
 
@@ -34,37 +32,35 @@ function loadQuizModule(src) {
 window.addEventListener('DOMContentLoaded', async () => {
     const page = document.body?.dataset?.page || '';
     try {
-        await loadQuizModule('js/i18n.js?v=40');
-        await loadQuizModule('js/i18n-runtime-bridge.js?v=40');
+        await loadQuizModule('js/i18n.js?v=41');
+        await loadQuizModule('js/i18n-runtime-bridge.js?v=41');
+        await loadQuizModule('js/i18n-legacy-complete.js?v=41');
         await loadQuizModule('https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js');
-        await loadQuizModule('js/organizer-auth.js?v=40');
-        await loadQuizModule('js/mobile-google-auth.js?v=40');
-        await loadQuizModule('js/platform-features.js?v=40');
-        await loadQuizModule('js/billing.js?v=40');
+        await loadQuizModule('js/organizer-auth.js?v=41');
+        await loadQuizModule('js/mobile-google-auth.js?v=41');
+        await loadQuizModule('js/platform-features.js?v=41');
+        await loadQuizModule('js/billing.js?v=41');
 
         if (document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/home-role-flow.js?v=40');
-            await loadQuizModule('js/auth-page-navigation.js?v=40');
+            await loadQuizModule('js/home-role-flow.js?v=41');
+            await loadQuizModule('js/auth-page-navigation.js?v=41');
         }
 
-        await loadQuizModule('js/billing-dashboard-only.js?v=40');
-        await loadQuizModule('js/auth-ux-fix.js?v=40');
-        await loadQuizModule('js/password-toggle.js?v=40');
+        await loadQuizModule('js/billing-dashboard-only.js?v=41');
+        await loadQuizModule('js/auth-ux-fix.js?v=41');
+        await loadQuizModule('js/password-toggle.js?v=41');
 
         if (page === 'player' || document.body.classList.contains('home-page')) {
-            await loadQuizModule('js/player-session-auth.js?v=40');
-            await loadQuizModule('js/participant-guard.js?v=40');
+            await loadQuizModule('js/player-session-auth.js?v=41');
+            await loadQuizModule('js/participant-guard.js?v=41');
         }
-        if (page === 'player' || page === 'admin') {
-            await loadQuizModule('js/speed-scoring.js?v=40');
-        }
+        if (page === 'player' || page === 'admin') await loadQuizModule('js/speed-scoring.js?v=41');
         if (page === 'admin') {
-            await loadQuizModule('js/participant-guard.js?v=40');
-            await loadQuizModule('js/pptx-import.js?v=40');
-            await loadQuizModule('js/ai-question-generator.js?v=40');
+            await loadQuizModule('js/participant-guard.js?v=41');
+            await loadQuizModule('js/pptx-import.js?v=41');
+            await loadQuizModule('js/ai-question-generator.js?v=41');
         }
-
-        await loadQuizModule('js/unified-runtime.js?v=40');
+        await loadQuizModule('js/unified-runtime.js?v=41');
     } catch (error) {
         console.error('Erreur de chargement des modules QuizLive :', error);
     }
