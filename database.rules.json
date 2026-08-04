@@ -7,7 +7,14 @@
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['uid','email','role','active']) && newData.child('uid').val() === auth.uid && newData.child('role').val() === 'organizer' && newData.child('active').isBoolean()"
+        ".validate": "!newData.exists() || (newData.hasChildren(['uid','email','role','active']) && newData.child('uid').val() === $uid && newData.child('email').isString() && newData.child('role').val() === 'organizer' && newData.child('active').isBoolean())"
+      }
+    },
+
+    "subscriptions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
       }
     },
 
@@ -15,24 +22,27 @@
       "$organizationId": {
         ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).exists())",
         ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid)",
-        ".validate": "newData.hasChildren(['id','name','type','ownerUid','plan','active']) && newData.child('id').val() === $organizationId && newData.child('name').isString() && newData.child('name').val().length >= 2 && (newData.child('type').val() === 'company' || newData.child('type').val() === 'school' || newData.child('type').val() === 'association') && newData.child('ownerUid').isString() && (newData.child('plan').val() === 'free' || newData.child('plan').val() === 'pro' || newData.child('plan').val() === 'business' || newData.child('plan').val() === 'enterprise') && newData.child('active').isBoolean()"
+        "pendingInvites": {
+          "$emailKey": {
+            ".read": "auth != null && root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid",
+            ".write": "auth != null && root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid"
+          }
+        }
       }
     },
 
     "organizationMembers": {
       "$organizationId": {
-        ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
-        ".validate": "newData.numChildren() <= 4",
+        ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).exists())",
         "$uid": {
-          ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || (auth.uid === $uid && !data.exists()))"
+          ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || auth.uid === $uid)"
         }
       }
     },
 
     "organizationGroups": {
       "$organizationId": {
-        ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
-        ".validate": "newData.numChildren() <= 3",
+        ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationMembers').child($organizationId).child(auth.uid).exists())",
         "$groupId": {
           ".write": "auth != null && root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid"
         }
@@ -41,8 +51,8 @@
 
     "organizationGroupMembers": {
       "$organizationId": {
-        ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
         "$groupId": {
+          ".read": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || root.child('organizationGroupMembers').child($organizationId).child($groupId).child(auth.uid).exists())",
           "$uid": {
             ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || auth.uid === $uid)"
           }
@@ -50,10 +60,10 @@
       }
     },
 
-    "organizationInvites": {
-      "$code": {
-        ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid) || (data.exists() && (data.child('createdBy').val() === auth.uid || (newData.child('acceptedBy').val() === auth.uid && data.child('status').val() === 'pending'))))"
+    "organizationEmailInvites": {
+      "$emailKey": {
+        ".read": "auth != null && (data.child('createdBy').val() === auth.uid || (auth.token.email != null && data.child('email').val() === auth.token.email))",
+        ".write": "auth != null && ((!data.exists() && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid) || (data.exists() && auth.token.email != null && data.child('email').val() === auth.token.email))"
       }
     },
 
@@ -69,10 +79,14 @@
     "organizerSessions": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        "$code": {
-          ".validate": "newData.hasChildren(['code','name','createdAt','status']) && newData.child('code').val() === $code"
-        }
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "savedSessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
 
@@ -81,18 +95,6 @@
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
-    },
-
-    "subscriptions": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": false
-      }
-    },
-
-    "stripeCustomers": {
-      ".read": false,
-      ".write": false
     },
 
     "sessionPseudos": {
@@ -108,56 +110,50 @@
     "sessions": {
       "$code": {
         ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && root.child('organizers').child(auth.uid).child('active').val() === true && newData.child('ownerUid').val() === auth.uid) || (data.exists() && data.child('ownerUid').val() === auth.uid))",
-
-        "ownerUid": {
-          ".validate": "newData.isString() && ((!data.exists() && newData.val() === auth.uid) || newData.val() === data.val())"
-        },
-
-        "maxParticipants": {
-          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= (root.child('subscriptions').child(auth.uid).child('participantLimit').exists() ? root.child('subscriptions').child(auth.uid).child('participantLimit').val() : 10)"
-        },
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && root.child('organizers').child(auth.uid).child('active').val() === true) || (data.exists() && data.child('ownerUid').val() === auth.uid))",
 
         "participants": {
-          ".validate": "newData.numChildren() <= (root.child('sessions').child($code).child('maxParticipants').exists() ? root.child('sessions').child($code).child('maxParticipants').val() : 10)",
           "$participantId": {
             ".read": "auth != null",
             ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
-            ".validate": "!newData.exists() || (newData.hasChildren(['id','name','joinedAt']) && newData.child('id').val() === $participantId && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['id','name','joinedAt']) && newData.child('id').val() === $participantId && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30 && newData.child('joinedAt').isNumber())",
 
             "answers": {
               "$questionIndex": {
                 ".write": "auth != null && auth.uid === $participantId && !data.exists()"
               }
             },
-
             "answerTimes": {
               "$questionIndex": {
                 ".write": "auth != null && auth.uid === $participantId"
               }
             },
-
             "answerPoints": {
               "$questionIndex": {
                 ".write": "auth != null && auth.uid === $participantId",
                 ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
               }
             },
-
             "score": {
               ".write": "auth != null && auth.uid === $participantId",
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() || newData.val() >= data.val())"
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+            },
+            "lastSeenAt": {
+              ".write": "auth != null && auth.uid === $participantId",
+              ".validate": "newData.isNumber()"
+            },
+            "connected": {
+              ".write": "auth != null && auth.uid === $participantId",
+              ".validate": "newData.isBoolean()"
             }
           }
         }
       }
     },
 
-    "savedSessions": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
-      }
+    "stripeCustomers": {
+      ".read": false,
+      ".write": false
     }
   }
 }
