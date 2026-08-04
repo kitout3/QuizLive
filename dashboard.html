@@ -6,6 +6,7 @@
   <title>Mon espace — QuizLive</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/dashboard-stage3.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body data-page="dashboard" class="dashboard-page">
@@ -15,9 +16,11 @@
       <nav class="dashboard-nav" aria-label="Navigation organisateur">
         <button class="dashboard-nav-item active" data-section="overview">📊 Vue d’ensemble</button>
         <button class="dashboard-nav-item" data-section="quizzes">📚 Mes quiz</button>
-        <button class="dashboard-nav-item" data-section="organization">🏢 Organisation</button>
+        <button class="dashboard-nav-item" data-stage3-section="history">🕘 Historique</button>
+        <button class="dashboard-nav-item" data-section="organization" data-stage3-section="organization">🏢 Organisation</button>
         <button class="dashboard-nav-item" data-section="billing">💳 Abonnement</button>
-        <button class="dashboard-nav-item" data-section="profile">👤 Mon profil</button>
+        <button class="dashboard-nav-item" data-section="profile" data-stage3-section="profile">👤 Mon profil</button>
+        <button class="dashboard-nav-item" data-stage3-section="settings">⚙️ Paramètres</button>
       </nav>
       <div class="dashboard-sidebar-bottom">
         <a class="dashboard-nav-item" href="index.html">← Retour à l’accueil</a>
@@ -39,6 +42,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/dashboard-page.js?v=31"></script>
+  <script src="js/dashboard-page.js?v=32"></script>
+  <script src="js/dashboard-stage3.js?v=32"></script>
 </body>
 </html>
