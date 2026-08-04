@@ -16,15 +16,41 @@
     if (overview && !overview.classList.contains('active')) overview.click();
   }
 
-  function loadEnterpriseModule() {
-    if (loaded || document.querySelector('script[data-enterprise-dashboard="77"]')) return;
+  function loadScript(src, marker) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[data-enterprise-module="${marker}"]`)) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = src;
+      script.dataset.enterpriseModule = marker;
+      script.async = false;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  }
+
+  async function loadEnterpriseModules() {
+    if (loaded) return;
     loaded = true;
-    const script = document.createElement('script');
-    script.src = 'js/dashboard-enterprise-groups.js?v=77';
-    script.dataset.enterpriseDashboard = '77';
-    script.async = false;
-    script.onerror = error => console.error('Chargement de l’espace entreprise impossible :', error);
-    document.body.appendChild(script);
+
+    const modules = [
+      ['js/dashboard-enterprise-groups.js?v=77', 'groups'],
+      ['js/enterprise-invite-form-v1.js?v=77', 'invite-form'],
+      ['js/enterprise-access-view.js?v=77', 'access-view'],
+      ['js/enterprise-delete-icons.js?v=77', 'delete-icons'],
+      ['js/enterprise-management-v2.js?v=77', 'management']
+    ];
+
+    try {
+      for (const [src, marker] of modules) await loadScript(src, marker);
+    } catch (error) {
+      loaded = false;
+      console.error('Chargement de l’espace entreprise impossible :', error);
+    }
   }
 
   auth.onAuthStateChanged(async user => {
@@ -38,6 +64,6 @@
       return;
     }
 
-    loadEnterpriseModule();
+    await loadEnterpriseModules();
   });
 })();
