@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '4.1.0';
+  const VERSION = '4.2.0';
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -41,9 +41,10 @@
   async function getAnonymousUser() {
     const { auth } = participantServices();
 
-    // Persistance uniquement en mémoire : aucun cookie, IndexedDB ou localStorage
-    // participant ne peut modifier la connexion organisateur.
-    await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+    // Cette persistance appartient uniquement à l'application Firebase nommée
+    // « quizlive-participant ». Elle survit à la redirection vers play.html sans
+    // modifier la session de l'application organisateur [DEFAULT].
+    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
     if (auth.currentUser?.isAnonymous) return auth.currentUser;
 
@@ -90,11 +91,14 @@
 
       step = 'inscription du participant';
       const participantRef = db.ref(`sessions/${code}/participants/${user.uid}`);
+      const existingSnap = await participantRef.once('value');
+      const existing = existingSnap.val() || {};
       const now = Date.now();
+
       await participantRef.set({
         id: user.uid,
         name,
-        joinedAt: now,
+        joinedAt: Number(existing.joinedAt || now),
         lastSeenAt: now,
         connected: true
       });
@@ -112,7 +116,7 @@
       sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
       sessionStorage.setItem('quizliveParticipantUid', user.uid);
 
-      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=59`);
+      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=60`);
     } catch (error) {
       notify(readableError(error, step), 'error');
     } finally {
