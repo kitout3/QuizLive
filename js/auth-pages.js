@@ -9,8 +9,22 @@
   const successBox = document.getElementById('authPageSuccess');
   const submitButton = document.getElementById('authSubmit');
   const googleButton = document.getElementById('authGoogle');
-  const nextUrl = new URLSearchParams(location.search).get('next') || 'index.html';
 
+  function safeReturnUrl() {
+    const params = new URLSearchParams(location.search);
+    const requested = params.get('return') || params.get('next') || sessionStorage.getItem('quizliveAuthReturn') || 'dashboard.html';
+    sessionStorage.removeItem('quizliveAuthReturn');
+    try {
+      const decoded = decodeURIComponent(requested);
+      const target = new URL(decoded, location.href);
+      if (target.origin !== location.origin || !target.pathname.startsWith('/QuizLive/')) return 'dashboard.html';
+      return `${target.pathname.split('/QuizLive/')[1] || 'dashboard.html'}${target.search}${target.hash}`;
+    } catch (_) {
+      return 'dashboard.html';
+    }
+  }
+
+  const returnUrl = safeReturnUrl();
   const setError = message => { if (errorBox) errorBox.textContent = message || ''; };
   const setSuccess = message => { if (successBox) successBox.textContent = message || ''; };
   const friendly = error => window.QuizOrganizer?.authMessage?.(error) || 'Une erreur est survenue. Réessayez.';
@@ -30,13 +44,8 @@
     });
   }
 
-  async function redirectIfConnected() {
-    const user = firebase.auth().currentUser;
-    if (user && !user.isAnonymous) {
-      location.replace(nextUrl);
-      return true;
-    }
-    return false;
+  function goBackToRequestedPage() {
+    location.replace(returnUrl || 'dashboard.html');
   }
 
   function togglePassword() {
@@ -53,10 +62,11 @@
     setError('');
     googleButton.disabled = true;
     googleButton.textContent = 'Connexion Google en cours…';
+    sessionStorage.setItem('quizliveAuthReturn', returnUrl);
     try {
       const organizer = await waitForOrganizer();
       await organizer.signInWithGoogle();
-      location.replace(nextUrl);
+      goBackToRequestedPage();
     } catch (error) {
       setError(friendly(error));
       googleButton.disabled = false;
@@ -77,13 +87,13 @@
 
       if (page === 'login') {
         await organizer.loginOrganizer(email, password);
-        location.replace(nextUrl);
+        goBackToRequestedPage();
       } else if (page === 'register') {
         const name = document.getElementById('authName')?.value.trim() || '';
         if (!name) throw new Error('Renseignez votre nom.');
         if (password.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
         await organizer.createOrganizer(email, password, name);
-        location.replace(nextUrl);
+        goBackToRequestedPage();
       } else if (page === 'forgot') {
         await organizer.sendPasswordReset(email);
         setSuccess('Un lien de réinitialisation a été envoyé. Vérifiez aussi les courriers indésirables.');
@@ -100,6 +110,6 @@
   googleButton?.addEventListener('click', googleAuth);
 
   firebase.auth().onAuthStateChanged(user => {
-    if (user && !user.isAnonymous && page !== 'forgot') redirectIfConnected();
+    if (user && !user.isAnonymous && page !== 'forgot') goBackToRequestedPage();
   });
 })();
