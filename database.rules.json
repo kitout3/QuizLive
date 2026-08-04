@@ -22,16 +22,47 @@
     "organizationMembers": {
       "$organizationId": {
         ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
+        ".validate": "newData.numChildren() <= 3",
         "$uid": {
-          ".write": "auth != null && (auth.uid === $uid || root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid)"
+          ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || (auth.uid === $uid && !data.exists()))"
         }
+      }
+    },
+
+    "organizationGroups": {
+      "$organizationId": {
+        ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
+        ".validate": "newData.numChildren() <= 3",
+        "$groupId": {
+          ".write": "auth != null && root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid"
+        }
+      }
+    },
+
+    "organizationGroupMembers": {
+      "$organizationId": {
+        ".read": "auth != null && root.child('organizationMembers').child($organizationId).child(auth.uid).exists()",
+        "$groupId": {
+          "$uid": {
+            ".write": "auth != null && (root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid || auth.uid === $uid)"
+          }
+        }
+      }
+    },
+
+    "organizationInvites": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid && root.child('organizations').child(newData.child('organizationId').val()).child('ownerUid').val() === auth.uid) || (data.exists() && (data.child('createdBy').val() === auth.uid || (newData.child('acceptedBy').val() === auth.uid && data.child('status').val() === 'pending'))))"
       }
     },
 
     "userOrganizations": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        "$organizationId": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('organizations').child($organizationId).child('ownerUid').val() === auth.uid)"
+        }
       }
     },
 
@@ -84,11 +115,11 @@
         },
 
         "maxParticipants": {
-          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= (root.child('subscriptions').child(auth.uid).child('participantLimit').exists() ? root.child('subscriptions').child(auth.uid).child('participantLimit').val() : 20)"
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= (root.child('subscriptions').child(auth.uid).child('participantLimit').exists() ? root.child('subscriptions').child(auth.uid).child('participantLimit').val() : 10)"
         },
 
         "participants": {
-          ".validate": "newData.numChildren() <= (root.child('sessions').child($code).child('maxParticipants').exists() ? root.child('sessions').child($code).child('maxParticipants').val() : 20)",
+          ".validate": "newData.numChildren() <= (root.child('sessions').child($code).child('maxParticipants').exists() ? root.child('sessions').child($code).child('maxParticipants').val() : 10)",
           "$participantId": {
             ".read": "auth != null",
             ".write": "auth != null && (auth.uid === $participantId || root.child('sessions').child($code).child('ownerUid').val() === auth.uid)",
