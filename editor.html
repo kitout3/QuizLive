@@ -2,95 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Éditeur de quiz — QuizLive</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/editor.css">
-  <link rel="stylesheet" href="css/editor-pptx-question-bank.css">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QuizLive</title>
+  <script>
+    const code = new URLSearchParams(location.search).get('code');
+    location.replace(code ? `admin.html?code=${encodeURIComponent(code)}` : 'index.html?create=1');
+  </script>
 </head>
-<body data-page="editor" class="editor-page">
-  <header class="editor-topbar">
-    <a href="dashboard.html?section=quizzes" class="editor-brand">⚡ <strong>QuizLive</strong></a>
-    <div class="editor-title-block">
-      <input id="quizTitle" maxlength="120" value="Nouveau quiz" aria-label="Nom du quiz">
-      <span id="saveStatus">Chargement…</span>
-    </div>
-    <div class="editor-top-actions">
-      <button id="saveQuizBtn" class="editor-secondary">Enregistrer</button>
-      <a id="openLiveBtn" class="btn-primary disabled" href="#">Préparer le lancement</a>
-    </div>
-  </header>
-
-  <main class="editor-shell">
-    <aside class="editor-sidebar">
-      <div class="editor-sidebar-head"><strong>Contenu</strong><span id="itemCount">0 élément</span></div>
-      <div id="editorItemList" class="editor-item-list"></div>
-      <div class="editor-add-grid">
-        <button data-add="mcq">+ QCM</button>
-        <button data-add="truefalse">+ Vrai / Faux</button>
-        <button data-add="wordcloud">+ Nuage de mots</button>
-        <button data-add="slide">+ Slide</button>
-      </div>
-    </aside>
-
-    <section class="editor-workspace">
-      <div id="editorEmpty" class="editor-empty"><span>✨</span><h2>Construisez votre quiz</h2><p>Ajoutez une question, importez un document ou utilisez l’IA.</p></div>
-      <form id="editorForm" class="editor-form" hidden>
-        <div class="editor-form-head"><span id="editorTypeBadge"></span><button type="button" id="deleteItemBtn" class="editor-danger">Supprimer</button></div>
-        <div id="questionFields">
-          <label>Question<textarea id="questionText" rows="3" maxlength="500"></textarea></label>
-          <div id="answerFields" class="editor-answers"></div>
-          <label id="explanationLabel">Explication<textarea id="questionExplanation" rows="2" maxlength="600" placeholder="Facultatif"></textarea></label>
-        </div>
-        <div id="slideFields" hidden>
-          <label>Titre de la slide<input id="slideTitle" maxlength="160"></label>
-          <div id="slidePreview" class="editor-slide-preview"></div>
-          <label>Image de remplacement<input id="slideImageInput" type="file" accept="image/*"></label>
-        </div>
-      </form>
-    </section>
-
-    <aside class="editor-tools">
-      <h2>Ajouter du contenu</h2>
-      <button class="editor-tool" id="aiTool"><span>✨</span><div><strong>Générer avec l’IA</strong><small>Thème, niveau et quantité</small></div></button>
-      <button class="editor-tool" id="questionBankTool"><span>📚</span><div><strong>Banque de questions</strong><small>Rechercher et réutiliser</small></div></button>
-      <button class="editor-tool" id="pptxTool"><span>📽️</span><div><strong>Importer PowerPoint</strong><small>Conversion automatique fidèle</small></div></button>
-      <button class="editor-tool" id="excelTool"><span>📊</span><div><strong>Importer Excel / CSV</strong><small>Questions et réponses</small></div></button>
-      <button class="editor-tool" id="pdfTool"><span>📄</span><div><strong>Importer un PDF</strong><small>Une page devient une slide</small></div></button>
-      <button class="editor-tool" id="slidesTool"><span>🖼️</span><div><strong>Importer des images</strong><small>PNG, JPG ou WebP</small></div></button>
-      <input id="pptxInput" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
-      <input id="spreadsheetInput" type="file" accept=".xlsx,.xls,.csv" hidden>
-      <input id="pdfInput" type="file" accept="application/pdf" hidden>
-      <input id="imagesInput" type="file" accept="image/*" multiple hidden>
-      <hr>
-      <h2>Réglages</h2>
-      <label class="editor-switch"><input id="timerSetting" type="checkbox" checked><span>Timer activé</span></label>
-      <label class="editor-switch"><input id="animationsSetting" type="checkbox" checked><span>Animations activées</span></label>
-      <label class="editor-switch"><input id="musicSetting" type="checkbox"><span>Musique activée</span></label>
-    </aside>
-  </main>
-
-  <div id="aiPanel" class="editor-drawer" hidden>
-    <div class="editor-drawer-card">
-      <button id="closeAiPanel" class="editor-close">×</button>
-      <h2>✨ Générer des questions</h2>
-      <label>Thème<input id="aiTheme" placeholder="Ex. Histoire de France"></label>
-      <div class="editor-two-cols"><label>Nombre<input id="aiCount" type="number" min="1" max="20" value="5"></label><label>Niveau<select id="aiLevel"><option>Facile</option><option selected>Intermédiaire</option><option>Difficile</option></select></label></div>
-      <label>Format<select id="aiFormat"><option value="mcq">QCM</option><option value="truefalse">Vrai / Faux</option><option value="mixed">Mixte</option></select></label>
-      <button id="generateAiBtn" class="btn-primary">Générer</button>
-      <div id="aiResult" class="editor-ai-result"></div>
-    </div>
-  </div>
-
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/editor-page.js?v=37"></script>
-  <script src="js/editor-pptx-question-bank.js?v=37"></script>
-  <script src="js/editor-launch-routing.js?v=37"></script>
-</body>
+<body></body>
 </html>
