@@ -12,7 +12,6 @@
     .replace(/\//g, '_');
 
   let currentUser = null;
-  let accepting = false;
 
   function notify(text, type = 'success') {
     if (typeof window.showToast === 'function') {
@@ -94,7 +93,9 @@
       String(group?.name || '').trim().toLowerCase() === String(groupName || '').trim().toLowerCase()
     );
 
-    if (!groupEntry) throw new Error('Groupe introuvable. Rechargez la page puis réessayez.');
+    if (!groupEntry) {
+      throw new Error('Groupe introuvable. Rechargez la page puis réessayez.');
+    }
 
     const [groupId, group] = groupEntry;
     const key = emailKey(email);
@@ -111,87 +112,19 @@
       createdAt: now
     };
 
-    const updates = {};
-    updates[`organizationEmailInvites/${key}`] = invite;
-    updates[`organizations/${context.organizationId}/pendingInvites/${key}`] = {
-      email,
-      emailKey: key,
-      groupId,
-      groupName: group.name || 'Groupe',
-      status: 'pending',
-      createdAt: now
-    };
-
-    await db.ref().update(updates);
-    window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
-  }
-
-  async function acceptInvite(user) {
-    if (!user?.email || accepting) return false;
-    accepting = true;
-
-    try {
-      const email = normalizeEmail(user.email);
-      const key = emailKey(email);
-      const inviteSnap = await db.ref(`organizationEmailInvites/${key}`).once('value');
-      const invite = inviteSnap.val();
-
-      if (!invite || invite.status !== 'pending' || normalizeEmail(invite.email) !== email) {
-        return false;
+    await db.ref().update({
+      [`organizationEmailInvites/${key}`]: invite,
+      [`organizations/${context.organizationId}/pendingInvites/${key}`]: {
+        email,
+        emailKey: key,
+        groupId,
+        groupName: group.name || 'Groupe',
+        status: 'pending',
+        createdAt: now
       }
+    });
 
-      const now = firebase.database.ServerValue.TIMESTAMP;
-      const updates = {};
-
-      updates[`organizationMembers/${invite.organizationId}/${user.uid}/uid`] = user.uid;
-      updates[`organizationMembers/${invite.organizationId}/${user.uid}/email`] = email;
-      updates[`organizationMembers/${invite.organizationId}/${user.uid}/displayName`] = user.displayName || email;
-      updates[`organizationMembers/${invite.organizationId}/${user.uid}/role`] = 'member';
-      updates[`organizationMembers/${invite.organizationId}/${user.uid}/groupIds/${invite.groupId}`] = true;
-      updates[`organizationMembers/${invite.organizationId}/${user.uid}/joinedAt`] = now;
-
-      updates[`organizationGroupMembers/${invite.organizationId}/${invite.groupId}/${user.uid}`] = {
-        uid: user.uid,
-        role: 'member',
-        joinedAt: now
-      };
-
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/role`] = 'member';
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/name`] = invite.organizationName || 'Entreprise';
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/type`] = 'company';
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/plan`] = 'enterprise';
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/groupId`] = invite.groupId;
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/groupName`] = invite.groupName || 'Groupe';
-      updates[`userOrganizations/${user.uid}/${invite.organizationId}/groupIds/${invite.groupId}`] = true;
-
-      updates[`organizers/${user.uid}/plan`] = 'enterprise';
-      updates[`organizers/${user.uid}/enterpriseMember`] = true;
-      updates[`organizers/${user.uid}/defaultOrganizationId`] = invite.organizationId;
-      updates[`organizers/${user.uid}/updatedAt`] = now;
-
-      updates[`organizationEmailInvites/${key}/status`] = 'accepted';
-      updates[`organizationEmailInvites/${key}/acceptedBy`] = user.uid;
-      updates[`organizationEmailInvites/${key}/acceptedAt`] = now;
-      updates[`organizations/${invite.organizationId}/pendingInvites/${key}`] = null;
-
-      await db.ref().update(updates);
-
-      notify(`Accès au groupe ${invite.groupName || 'Entreprise'} activé.`);
-      window.dispatchEvent(new CustomEvent('quizlive-enterprise-membership-ready', {
-        detail: {
-          organizationId: invite.organizationId,
-          groupId: invite.groupId
-        }
-      }));
-
-      return true;
-    } catch (error) {
-      console.error('Activation automatique de l’invitation Enterprise :', error);
-      notify(error.message || 'Activation de l’accès impossible.', 'error');
-      return false;
-    } finally {
-      accepting = false;
-    }
+    window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
   }
 
   document.addEventListener('submit', async event => {
@@ -221,13 +154,10 @@
 
   auth.onAuthStateChanged(user => {
     currentUser = user && !user.isAnonymous ? user : null;
-    const ready = currentUser ? acceptInvite(currentUser) : Promise.resolve(false);
-    window.QuizLiveEnterpriseReady = ready;
   });
 
   window.QuizLiveEnterpriseInvites = {
     emailKey,
-    createInvite,
-    acceptInvite
+    createInvite
   };
 })();
