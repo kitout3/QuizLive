@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '4.2.0';
+  const VERSION = '5.0.0';
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -10,12 +10,20 @@
   const cleanName = value => String(value || '')
     .trim().replace(/[<>"'&]/g, '').replace(/\s+/g, ' ').slice(0, 30);
 
-  function participantServices() {
-    const services = window.QuizLiveFirebase;
-    if (!services?.participantAuth || !services?.participantDatabase) {
-      throw new Error('Le module Firebase participant n’est pas initialisé. Rechargez la page.');
+  const createParticipantId = () => {
+    if (globalThis.crypto?.randomUUID) {
+      return `p_${globalThis.crypto.randomUUID().replace(/-/g, '')}`;
     }
-    return { auth: services.participantAuth, db: services.participantDatabase };
+    const random = Math.random().toString(36).slice(2);
+    return `p_${Date.now().toString(36)}${random}`;
+  };
+
+  function participantDatabaseService() {
+    const db = window.QuizLiveFirebase?.participantDatabase
+      || window.QuizLiveFirebase?.organizerDatabase
+      || window.database;
+    if (!db) throw new Error('La base Firebase participante n’est pas initialisée.');
+    return db;
   }
 
   function notify(text, type = 'error') {
@@ -27,10 +35,7 @@
     const code = String(error?.code || '').toLowerCase();
     console.error(`[Participant ${VERSION}] ${step}`, error);
     if (code.includes('permission-denied') || code.includes('permission_denied')) {
-      return `Accès Firebase refusé pendant l’étape « ${step} ».`;
-    }
-    if (code.includes('operation-not-allowed')) {
-      return 'La connexion anonyme n’est pas activée dans Firebase Authentication.';
+      return `Accès Firebase refusé pendant l’étape « ${step} ». Publiez les règles database.rules.json version 5.`;
     }
     if (code.includes('network-request-failed')) {
       return 'Connexion réseau interrompue. Réessayez.';
@@ -38,35 +43,16 @@
     return error?.message || `Connexion impossible pendant l’étape « ${step} ».`;
   }
 
-  async function getAnonymousUser() {
-    const { auth } = participantServices();
-
-    // Cette persistance appartient uniquement à l'application Firebase nommée
-    // « quizlive-participant ». Elle survit à la redirection vers play.html sans
-    // modifier la session de l'application organisateur [DEFAULT].
-    await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
-
-    if (auth.currentUser?.isAnonymous) return auth.currentUser;
-
-    const credential = await auth.signInAnonymously();
-    if (!credential?.user?.uid) {
-      throw new Error('Firebase n’a pas créé de compte participant anonyme.');
-    }
-    return credential.user;
-  }
-
   async function readSessionMetadata(db, code) {
-    const [codeSnap, statusSnap] = await Promise.all([
-      db.ref(`sessions/${code}/code`).once('value'),
-      db.ref(`sessions/${code}/status`).once('value')
-    ]);
+    const snapshot = await db.ref(`sessions/${code}`).once('value');
+    if (!snapshot.exists()) throw new Error('Session introuvable. Vérifiez le code.');
 
-    if (!codeSnap.exists()) throw new Error('Session introuvable. Vérifiez le code.');
-
-    const status = statusSnap.val() || 'waiting';
+    const session = snapshot.val() || {};
+    const status = session.status || 'waiting';
     if (!['waiting', 'active', 'En préparation', 'En cours'].includes(status)) {
       throw new Error('Cette session est terminée.');
     }
+    return session;
   }
 
   async function join(codeInput, nameInput) {
@@ -81,22 +67,28 @@
       if (code.length !== 6) throw new Error('Le code de session doit contenir 6 caractères.');
       if (!name) throw new Error('Saisissez un pseudo.');
 
-      const { db } = participantServices();
-
-      step = 'authentification anonyme';
-      const user = await getAnonymousUser();
+      const db = participantDatabaseService();
 
       step = 'lecture de la session';
       await readSessionMetadata(db, code);
 
+      const previous = (() => {
+        try { return JSON.parse(sessionStorage.getItem('quizSession') || '{}'); }
+        catch (_) { return {}; }
+      })();
+
+      const participantId = previous.code === code && previous.participantId
+        ? previous.participantId
+        : createParticipantId();
+
       step = 'inscription du participant';
-      const participantRef = db.ref(`sessions/${code}/participants/${user.uid}`);
+      const participantRef = db.ref(`sessions/${code}/participants/${participantId}`);
       const existingSnap = await participantRef.once('value');
       const existing = existingSnap.val() || {};
       const now = Date.now();
 
       await participantRef.set({
-        id: user.uid,
+        id: participantId,
         name,
         joinedAt: Number(existing.joinedAt || now),
         lastSeenAt: now,
@@ -106,17 +98,15 @@
       const sessionData = {
         code,
         isAdmin: false,
-        participantId: user.uid,
-        odparticipantId: user.uid,
-        playerId: user.uid,
+        participantId,
+        odparticipantId: participantId,
+        playerId: participantId,
         name,
         joinVersion: VERSION
       };
 
       sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
-      sessionStorage.setItem('quizliveParticipantUid', user.uid);
-
-      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=60`);
+      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=61`);
     } catch (error) {
       notify(readableError(error, step), 'error');
     } finally {
