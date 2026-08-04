@@ -1,10 +1,11 @@
-// QuizLive — droits effectifs du tableau de bord.
+// QuizLive — droits effectifs du compte et du tableau de bord.
 (() => {
   'use strict';
 
   const auth = window.QuizLiveFirebase?.organizerAuth || firebase.auth();
   const db = window.QuizLiveFirebase?.organizerDatabase || database;
   const PLAN_KEYS = new Set(['free', 'pro', 'business', 'enterprise']);
+  const PLAN_LIMITS = { free: 10, pro: 50, business: 200, enterprise: 500 };
   const INVALID_STATUSES = new Set(['inactive', 'canceled', 'cancelled', 'expired', 'unpaid']);
   const cache = new Map();
 
@@ -15,6 +16,7 @@
     subscriptionValid: false,
     subscribedPlan: 'free',
     effectivePlan: 'free',
+    participantLimit: PLAN_LIMITS.free,
     hasEnterpriseWorkspace: false,
     organizationId: '',
     groupIds: [],
@@ -106,6 +108,23 @@
     };
   }
 
+  async function synchronizeProfile(user, result) {
+    try {
+      const updates = {
+        plan: result.effectivePlan,
+        enterpriseMember: result.hasEnterpriseWorkspace,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+      };
+
+      if (result.hasEnterpriseWorkspace) updates.defaultOrganizationId = result.organizationId;
+      else updates.defaultOrganizationId = null;
+
+      await db.ref(`organizers/${user.uid}`).update(updates);
+    } catch (error) {
+      console.warn('Synchronisation du plan effectif impossible :', error);
+    }
+  }
+
   async function resolve(user = auth.currentUser, force = false) {
     if (!user || user.isAnonymous) return emptyResult(user);
     if (!force && cache.has(user.uid)) return cache.get(user.uid);
@@ -122,21 +141,25 @@
       const workspace = await resolveWorkspace(user, linksSnap.val() || {});
 
       // Un membre d’un groupe Enterprise hérite de l’offre Enterprise.
-      // Sans groupe Enterprise valide, un ancien profil ou un ancien lien ne suffit pas.
-      // Les offres Pro et Business restent pilotées par un abonnement valide.
+      // Sans groupe Enterprise valide, un ancien profil ou un abonnement Enterprise
+      // isolé ne suffit pas. Pro et Business exigent un abonnement valide.
       let effectivePlan = 'free';
       if (workspace.hasEnterpriseWorkspace) effectivePlan = 'enterprise';
       else if (subscriptionValid && subscribedPlan !== 'enterprise') effectivePlan = subscribedPlan;
 
-      return {
+      const result = {
         uid: user.uid,
         subscription,
         subscriptionExists: subscriptionSnap.exists(),
         subscriptionValid,
         subscribedPlan,
         effectivePlan,
+        participantLimit: PLAN_LIMITS[effectivePlan] || PLAN_LIMITS.free,
         ...workspace
       };
+
+      synchronizeProfile(user, result);
+      return result;
     })();
 
     cache.set(user.uid, pending);
@@ -146,7 +169,7 @@
       return result;
     } catch (error) {
       cache.delete(user.uid);
-      console.warn('Résolution des droits du tableau de bord impossible :', error);
+      console.warn('Résolution des droits du compte impossible :', error);
       return emptyResult(user);
     }
   }
@@ -173,7 +196,8 @@
     version: '77',
     resolve,
     clear,
-    applyEnterpriseNavigation
+    applyEnterpriseNavigation,
+    limitForPlan: plan => PLAN_LIMITS[normalize(plan)] || PLAN_LIMITS.free
   };
 
   window.addEventListener('quizlive-enterprise-membership-ready', () => clear(auth.currentUser?.uid));
