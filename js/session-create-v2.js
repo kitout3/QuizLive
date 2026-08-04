@@ -15,6 +15,11 @@
     }
   }
 
+  async function groupContext() {
+    if (typeof window.QuizLiveGroupSharing?.selectedGroupContext !== 'function') return null;
+    return window.QuizLiveGroupSharing.selectedGroupContext();
+  }
+
   async function createSession(sessionName, adminName) {
     const user = firebase.auth().currentUser;
     if (!user || user.isAnonymous) throw new Error('Connexion organisateur requise.');
@@ -22,9 +27,11 @@
     const sessionCode = code();
     const now = Date.now();
     const maxParticipants = await participantLimit(user.uid);
+    const group = await groupContext();
 
     const sessionData = {
       ownerUid: user.uid,
+      ownerEmail: user.email || '',
       code: sessionCode,
       name: String(sessionName || '').trim().slice(0, 120),
       admin: String(adminName || user.displayName || user.email || 'Organisateur').trim().slice(0, 120),
@@ -38,13 +45,44 @@
       maxParticipants
     };
 
-    await database.ref(`sessions/${sessionCode}`).set(sessionData);
-    await database.ref(`organizerSessions/${user.uid}/${sessionCode}`).set({
+    if (group) {
+      sessionData.organizationId = group.organizationId;
+      sessionData.organizationName = group.organizationName;
+      sessionData.groupId = group.groupId;
+      sessionData.groupName = group.groupName;
+    }
+
+    const organizerSummary = {
       code: sessionCode,
       name: sessionData.name,
       createdAt: now,
+      updatedAt: now,
       status: 'waiting'
-    }).catch(() => {});
+    };
+
+    if (group) {
+      organizerSummary.organizationId = group.organizationId;
+      organizerSummary.groupId = group.groupId;
+      organizerSummary.groupName = group.groupName;
+    }
+
+    const updates = {};
+    updates[`sessions/${sessionCode}`] = sessionData;
+    updates[`organizerSessions/${user.uid}/${sessionCode}`] = organizerSummary;
+
+    if (group) {
+      updates[`groupSessions/${group.organizationId}/${group.groupId}/${sessionCode}`] = {
+        code: sessionCode,
+        name: sessionData.name,
+        ownerUid: user.uid,
+        ownerEmail: user.email || '',
+        status: 'waiting',
+        createdAt: now,
+        updatedAt: now
+      };
+    }
+
+    await database.ref().update(updates);
 
     localStorage.setItem('quizSession', JSON.stringify({
       code: sessionCode,
