@@ -9,7 +9,7 @@ const firebaseConfig = {
 const ADMIN_UID_CONFIG = "7DEy3WkKdQgbz7Kh7KCIrScb2el2";
 
 // Instance principale : comptes organisateurs (email / mot de passe).
-const organizerApp = firebase.apps.find(app => app.name === '[DEFAULT]') || firebase.initializeApp(firebaseConfig);
+const organizerApp = firebase.apps.find(app => app.name === '[DEFAULT]]') || firebase.initializeApp(firebaseConfig);
 const organizerDatabase = organizerApp.database();
 const organizerAuth = organizerApp.auth();
 
@@ -39,3 +39,24 @@ window.QuizLiveFirebase = {
 const database = document.body?.dataset?.page === 'player'
   ? participantDatabase
   : organizerDatabase;
+
+// Charge une seule couche de traduction FR / EN sur toutes les pages utilisant config.js.
+(() => {
+  const version = '76';
+  if (
+    window.QuizI18n?.version === version ||
+    document.querySelector(`script[data-quizlive-i18n="${version}"]`)
+  ) {
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = `js/i18n-complete-v76.js?v=${version}`;
+  script.dataset.quizliveI18n = version;
+  script.async = false;
+  script.onerror = error => {
+    console.error('Chargement de la traduction QuizLive impossible :', error);
+  };
+
+  (document.head || document.documentElement).appendChild(script);
+})();
