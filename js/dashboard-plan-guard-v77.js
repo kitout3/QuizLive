@@ -27,6 +27,11 @@
     return lang() === 'en' ? 'Choose this plan' : 'Choisir cette offre';
   }
 
+  function startObserving() {
+    if (!observer || !content) return;
+    observer.observe(content, { childList: true, subtree: true, characterData: true });
+  }
+
   function removeTechnicalSubscriptionError() {
     content?.querySelectorAll('article.dashboard-card').forEach(card => {
       const code = card.querySelector('code');
@@ -90,24 +95,23 @@
   function correctPage() {
     if (correcting || !content || !entitlements) return;
     correcting = true;
+    observer?.disconnect();
     try {
       window.QuizLiveEntitlements?.applyEnterpriseNavigation?.(entitlements);
       correctBilling();
       correctOverview();
     } finally {
       correcting = false;
+      startObserving();
     }
   }
 
   auth.onAuthStateChanged(async user => {
     if (!user || user.isAnonymous) return;
     entitlements = await window.QuizLiveEntitlements?.resolve?.(user, true);
-    correctPage();
 
-    if (!observer && content) {
-      observer = new MutationObserver(correctPage);
-      observer.observe(content, { childList: true, subtree: true, characterData: true });
-    }
+    if (!observer && content) observer = new MutationObserver(correctPage);
+    correctPage();
   });
 
   document.addEventListener('quizlive:languagechange', correctPage);
