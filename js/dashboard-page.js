@@ -5,13 +5,16 @@
   const title = document.getElementById('dashboardTitle');
   const subtitle = document.getElementById('dashboardSubtitle');
   const sidebar = document.getElementById('dashboardSidebar');
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (!content || !title || !subtitle || !sidebar) return;
+
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const plans = {
     free: { label: 'Free', price: 0, limit: 10 },
     pro: { label: 'Pro', price: 15, limit: 50 },
     business: { label: 'Business', price: 30, limit: 200 },
     enterprise: { label: 'Enterprise', price: 50, limit: 500 }
   };
+
   let organizer = null;
   let sessions = [];
 
@@ -20,16 +23,27 @@
     subtitle.textContent = sub;
   }
 
+  function activePlanKey() {
+    const subscriptionPlan = String(organizer?.subscription?.plan || '').toLowerCase();
+    const profilePlan = String(organizer?.profile?.plan || '').toLowerCase();
+    if (plans[subscriptionPlan] && organizer?.subscription?.status !== 'inactive') return subscriptionPlan;
+    return plans[profilePlan] ? profilePlan : 'free';
+  }
+
   async function loadOrganizer(user) {
-    const snap = await database.ref(`organizers/${user.uid}`).once('value');
-    const profile = snap.val();
+    const [profileSnap, subscriptionSnap] = await Promise.all([
+      database.ref(`organizers/${user.uid}`).once('value'),
+      database.ref(`subscriptions/${user.uid}`).once('value')
+    ]);
+    const profile = profileSnap.val();
     if (!profile || profile.active === false) throw new Error('Compte organisateur introuvable ou inactif.');
-    organizer = { user, profile };
+    organizer = { user, profile, subscription: subscriptionSnap.val() || {} };
   }
 
   async function loadSessions() {
     const snap = await database.ref(`organizerSessions/${organizer.user.uid}`).once('value');
-    sessions = Object.entries(snap.val() || {}).map(([code, value]) => ({ code, ...value }))
+    sessions = Object.entries(snap.val() || {})
+      .map(([code, value]) => ({ code, ...value }))
       .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   }
 
@@ -41,11 +55,11 @@
       const snap = await database.ref(`sessions/${item.code}/participants`).once('value');
       const players = Object.values(snap.val() || {});
       participants += players.length;
-      for (const player of players) {
+      players.forEach(player => {
         const points = Object.values(player.answerPoints || {});
         answers += points.length;
         correct += points.filter(value => Number(value) > 0).length;
-      }
+      });
     }
     return { participants, answers, successRate: answers ? Math.round(correct / answers * 100) : 0 };
   }
@@ -55,7 +69,7 @@
     content.innerHTML = '<div class="dashboard-loading">Calcul des statistiques…</div>';
     const values = await stats();
     const profile = organizer.profile;
-    const plan = plans[profile.plan] || plans.free;
+    const plan = plans[activePlanKey()];
     content.innerHTML = `
       <div class="dashboard-stats">
         <div class="dashboard-stat"><strong>${sessions.length}</strong><span>Quiz créés</span></div>
@@ -64,7 +78,7 @@
         <div class="dashboard-stat"><strong>${values.successRate}%</strong><span>Taux de réussite</span></div>
       </div>
       <div class="dashboard-grid">
-        <article class="dashboard-card"><h2>Derniers quiz</h2>${sessions.length ? sessions.slice(0,5).map(s => `<div class="dashboard-row"><div><strong>${esc(s.name || s.code)}</strong><div class="dashboard-muted">${esc(s.code)} · ${s.createdAt ? new Date(Number(s.createdAt)).toLocaleDateString('fr-FR') : ''}</div></div><a class="btn-primary" href="admin.html?code=${encodeURIComponent(s.code)}">Ouvrir</a></div>`).join('') : '<p class="dashboard-muted">Aucun quiz créé.</p>'}</article>
+        <article class="dashboard-card"><h2>Derniers quiz</h2>${sessions.length ? sessions.slice(0, 5).map(s => `<div class="dashboard-row"><div><strong>${esc(s.name || s.code)}</strong><div class="dashboard-muted">${esc(s.code)} · ${s.createdAt ? new Date(Number(s.createdAt)).toLocaleDateString('fr-FR') : ''}</div></div><a class="btn-primary" href="admin.html?code=${encodeURIComponent(s.code)}">Ouvrir</a></div>`).join('') : '<p class="dashboard-muted">Aucun quiz créé.</p>'}</article>
         <article class="dashboard-card"><h2>Votre compte</h2><div class="dashboard-profile-line"><span class="dashboard-muted">Organisateur</span><strong>${esc(profile.displayName || organizer.user.displayName || 'Organisateur')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Email</span><strong>${esc(organizer.user.email || profile.email || '')}</strong></div><div class="dashboard-profile-line"><span class="dashboard-muted">Abonnement</span><strong>${plan.label} · ${plan.limit} participants</strong></div></article>
       </div>`;
   }
@@ -74,18 +88,10 @@
     content.innerHTML = `<article class="dashboard-card"><div class="dashboard-row"><h2 style="margin:0">${sessions.length} quiz</h2><a class="btn-primary" href="index.html?create=1">+ Nouveau quiz</a></div>${sessions.length ? sessions.map(s => `<div class="dashboard-row"><div><strong>${esc(s.name || s.code)}</strong><div class="dashboard-muted">Code ${esc(s.code)} · ${esc(s.status || 'waiting')}</div></div><a class="btn-primary" href="admin.html?code=${encodeURIComponent(s.code)}">Ouvrir</a></div>`).join('') : '<p class="dashboard-muted">Aucun quiz enregistré.</p>'}</article>`;
   }
 
-  async function renderOrganization() {
-    setHeading('Organisation', 'Consultez les organisations liées à votre compte.');
-    const snap = await database.ref(`userOrganizations/${organizer.user.uid}`).once('value');
-    const organizations = Object.entries(snap.val() || {}).map(([id, value]) => ({ id, ...value }));
-    content.innerHTML = `<article class="dashboard-card"><h2>Mes organisations</h2>${organizations.length ? organizations.map(org => `<div class="dashboard-row"><div><strong>${esc(org.name || org.id)}</strong><div class="dashboard-muted">${esc(org.type || '')}</div></div><span class="dashboard-badge">${esc(org.plan || 'free')}</span></div>`).join('') : '<p class="dashboard-muted">Aucune organisation liée à ce compte.</p>'}</article>`;
-  }
-
   async function renderBilling() {
     setHeading('Abonnement', 'Choisissez votre capacité maximale de participants par session.');
-    const snap = await database.ref(`subscriptions/${organizer.user.uid}`).once('value');
-    const subscription = snap.val() || {};
-    const current = plans[subscription.plan] ? subscription.plan : (plans[organizer.profile.plan] ? organizer.profile.plan : 'free');
+    const subscription = organizer.subscription || {};
+    const current = activePlanKey();
     content.innerHTML = `<div class="dashboard-plan-grid">${Object.entries(plans).map(([key, plan]) => `<article class="dashboard-plan ${key === current ? 'current' : ''}"><h2>${plan.label}</h2><div class="dashboard-plan-price">${plan.price} €<small style="font-size:14px;font-weight:500">/mois</small></div><p><strong>${plan.limit}</strong> participants maximum par session</p>${key === current ? '<span class="dashboard-badge">Offre actuelle</span>' : key === 'free' ? '' : `<button class="btn-primary" data-checkout="${key}">Choisir cette offre</button>`}</article>`).join('')}</div>${subscription.stripeCustomerId ? '<button class="btn-primary" id="billingPortal" style="justify-self:start">Gérer mon abonnement et mes factures</button>' : ''}`;
     content.querySelectorAll('[data-checkout]').forEach(button => button.onclick = () => window.QuizBilling?.startCheckout(button.dataset.checkout));
     document.getElementById('billingPortal')?.addEventListener('click', () => window.QuizBilling?.openBillingPortal());
@@ -98,12 +104,12 @@
   }
 
   async function switchSection(section) {
+    if (section === 'organization') return;
     document.querySelectorAll('.dashboard-nav-item[data-section]').forEach(button => button.classList.toggle('active', button.dataset.section === section));
     sidebar.classList.remove('open');
     try {
       if (section === 'overview') await renderOverview();
       else if (section === 'quizzes') renderQuizzes();
-      else if (section === 'organization') await renderOrganization();
       else if (section === 'billing') await renderBilling();
       else if (section === 'profile') renderProfile();
     } catch (error) {
@@ -111,7 +117,9 @@
     }
   }
 
-  document.querySelectorAll('[data-section]').forEach(button => button.onclick = () => switchSection(button.dataset.section));
+  document.querySelectorAll('[data-section]:not([data-section="organization"])').forEach(button => {
+    button.onclick = () => switchSection(button.dataset.section);
+  });
   document.getElementById('dashboardMenuButton').onclick = () => sidebar.classList.toggle('open');
   document.getElementById('dashboardLogout').onclick = async () => {
     await firebase.auth().signOut();
@@ -129,7 +137,9 @@
       await loadOrganizer(user);
       await loadSessions();
       const requested = new URLSearchParams(location.search).get('section') || 'overview';
-      await switchSection(['overview','quizzes','organization','billing','profile'].includes(requested) ? requested : 'overview');
+      if (requested !== 'organization') {
+        await switchSection(['overview', 'quizzes', 'billing', 'profile'].includes(requested) ? requested : 'overview');
+      }
     } catch (error) {
       content.innerHTML = `<div class="dashboard-empty">${esc(error.message || 'Impossible de charger votre espace.')}</div>`;
     }
