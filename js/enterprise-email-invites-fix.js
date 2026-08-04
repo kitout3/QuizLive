@@ -46,9 +46,16 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Adresse e-mail invalide.');
 
     const context = await ownerContext();
-    if (Object.keys(context.members).length >= MAX_ACCOUNTS) throw new Error(`La limite de ${MAX_ACCOUNTS} comptes est atteinte.`);
-    if (Object.values(context.members).some(member => normalizeEmail(member?.email) === email)) {
-      throw new Error('Cette adresse appartient déjà à un membre de l’entreprise.');
+    const pending = context.organization.pendingInvites || {};
+    const activeEmails = new Set(Object.values(context.members).map(member => normalizeEmail(member?.email)).filter(Boolean));
+    const pendingEntries = Object.values(pending).filter(invite => invite?.status === 'pending' && !activeEmails.has(normalizeEmail(invite.email)));
+
+    if (Object.keys(context.members).length + pendingEntries.length >= MAX_ACCOUNTS) {
+      throw new Error(`La limite de ${MAX_ACCOUNTS} comptes, invitations incluses, est atteinte.`);
+    }
+    if (activeEmails.has(email)) throw new Error('Cette adresse appartient déjà à un membre de l’entreprise.');
+    if (pendingEntries.some(invite => normalizeEmail(invite.email) === email)) {
+      throw new Error('Une invitation est déjà en attente pour cette adresse.');
     }
 
     const groupEntry = Object.entries(context.groups).find(([, group]) =>
@@ -57,8 +64,8 @@
     if (!groupEntry) throw new Error('Groupe introuvable. Rechargez la page puis réessayez.');
     const [groupId, group] = groupEntry;
     const key = emailKey(email);
-
-    await database.ref(`organizationEmailInvites/${key}`).set({
+    const now = firebase.database.ServerValue.TIMESTAMP;
+    const invite = {
       email,
       emailKey: key,
       organizationId: context.organizationId,
@@ -67,8 +74,21 @@
       groupName: group.name || 'Groupe',
       createdBy: currentUser.uid,
       status: 'pending',
-      createdAt: firebase.database.ServerValue.TIMESTAMP
-    });
+      createdAt: now
+    };
+
+    const updates = {};
+    updates[`organizationEmailInvites/${key}`] = invite;
+    updates[`organizations/${context.organizationId}/pendingInvites/${key}`] = {
+      email,
+      emailKey: key,
+      groupId,
+      groupName: group.name || 'Groupe',
+      status: 'pending',
+      createdAt: now
+    };
+    await database.ref().update(updates);
+    window.dispatchEvent(new CustomEvent('quizlive-enterprise-invite-updated'));
   }
 
   async function acceptInvite(user) {
