@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '3.1.1';
+  const VERSION = '4.0.0';
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -10,6 +10,17 @@
   const cleanName = value => String(value || '')
     .trim().replace(/[<>"'&]/g, '').replace(/\s+/g, ' ').slice(0, 30);
 
+  function participantServices() {
+    const services = window.QuizLiveFirebase;
+    if (!services?.participantAuth || !services?.participantDatabase) {
+      throw new Error('Le module Firebase participant n’est pas initialisé. Rechargez la page.');
+    }
+    return {
+      auth: services.participantAuth,
+      db: services.participantDatabase
+    };
+  }
+
   function notify(text, type = 'error') {
     if (typeof window.showToast === 'function') window.showToast(text, type);
     else alert(text);
@@ -17,9 +28,9 @@
 
   function readableError(error, step) {
     const code = String(error?.code || '').toLowerCase();
-    console.error(`[Participant v3] ${step}`, error);
+    console.error(`[Participant v4] ${step}`, error);
     if (code.includes('permission-denied') || code.includes('permission_denied')) {
-      return `Accès Firebase refusé pendant l’étape « ${step} ». Les règles Realtime Database publiées ne correspondent pas au code actuel.`;
+      return `Accès Firebase refusé pendant l’étape « ${step} ». Vérifiez les règles Realtime Database publiées.`;
     }
     if (code.includes('operation-not-allowed')) {
       return 'La connexion anonyme n’est pas activée dans Firebase Authentication.';
@@ -31,45 +42,35 @@
   }
 
   async function getAnonymousUser() {
-    const auth = firebase.auth();
+    const { auth } = participantServices();
+
+    // Persistance propre à l'instance Firebase secondaire. Elle ne touche jamais
+    // la connexion email/mot de passe de l'organisateur sur l'instance principale.
     await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
-    const tabUid = sessionStorage.getItem('quizliveParticipantUid');
-    let current = auth.currentUser;
+    const current = auth.currentUser;
+    if (current?.isAnonymous) return current;
 
-    if (current && !current.isAnonymous) {
-      throw new Error('Ce navigateur est connecté comme organisateur. Ouvrez le lien participant dans une fenêtre privée ou sur un autre appareil.');
-    }
-
-    if (current?.isAnonymous && tabUid && current.uid === tabUid) return current;
-    if (current?.isAnonymous && (!tabUid || current.uid !== tabUid)) {
-      await auth.signOut();
-      current = null;
-    }
-
+    // Aucun signOut() de l'instance principale n'est exécuté ici.
     const credential = await auth.signInAnonymously();
-    if (!credential?.user?.uid) throw new Error('Firebase n’a pas créé de compte participant anonyme.');
-    sessionStorage.setItem('quizliveParticipantUid', credential.user.uid);
+    if (!credential?.user?.uid) {
+      throw new Error('Firebase n’a pas créé de compte participant anonyme.');
+    }
     return credential.user;
   }
 
-  async function readSessionMetadata(code) {
-    const [codeSnap, statusSnap, maxSnap] = await Promise.all([
-      database.ref(`sessions/${code}/code`).once('value'),
-      database.ref(`sessions/${code}/status`).once('value'),
-      database.ref(`sessions/${code}/maxParticipants`).once('value')
+  async function readSessionMetadata(db, code) {
+    const [codeSnap, statusSnap] = await Promise.all([
+      db.ref(`sessions/${code}/code`).once('value'),
+      db.ref(`sessions/${code}/status`).once('value')
     ]);
 
     if (!codeSnap.exists()) throw new Error('Session introuvable. Vérifiez le code.');
+
     const status = statusSnap.val() || 'waiting';
     if (!['waiting', 'active', 'En préparation', 'En cours'].includes(status)) {
       throw new Error('Cette session est terminée.');
     }
-
-    return {
-      status,
-      maxParticipants: Number(maxSnap.val() || 500)
-    };
   }
 
   async function join(codeInput, nameInput) {
@@ -84,14 +85,16 @@
       if (code.length !== 6) throw new Error('Le code de session doit contenir 6 caractères.');
       if (!name) throw new Error('Saisissez un pseudo.');
 
+      const { db } = participantServices();
+
       step = 'authentification anonyme';
       const user = await getAnonymousUser();
 
       step = 'lecture de la session';
-      await readSessionMetadata(code);
+      await readSessionMetadata(db, code);
 
       step = 'inscription du participant';
-      const participantRef = database.ref(`sessions/${code}/participants/${user.uid}`);
+      const participantRef = db.ref(`sessions/${code}/participants/${user.uid}`);
       const existingSnap = await participantRef.once('value');
       const existing = existingSnap.val() || {};
       const now = Date.now();
@@ -114,11 +117,12 @@
         joinVersion: VERSION
       };
 
-      step = 'sauvegarde locale';
+      // Stockage limité à cet onglet. Ne remplace jamais la session locale
+      // de l'organisateur ouverte dans un autre onglet du même navigateur.
       sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
-      localStorage.setItem('quizSession', JSON.stringify(sessionData));
+      sessionStorage.setItem('quizliveParticipantUid', user.uid);
 
-      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=57`);
+      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=58`);
     } catch (error) {
       notify(readableError(error, step), 'error');
     } finally {
