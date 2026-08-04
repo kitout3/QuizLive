@@ -1,10 +1,12 @@
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret, defineString } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getDatabase } = require('firebase-admin/database');
 const Stripe = require('stripe');
 
+setGlobalOptions({ region: 'europe-west1', maxInstances: 10 });
 initializeApp();
 
 const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
