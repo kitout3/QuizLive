@@ -3,12 +3,9 @@
 
   const MAX_ACCOUNTS = 4;
   let currentUser = null;
-  let processing = false;
+  let accepting = false;
 
   const normalizeEmail = value => String(value || '').trim().toLowerCase();
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[char]));
 
   function emailKey(email) {
     const normalized = normalizeEmail(email);
@@ -31,9 +28,14 @@
   }
 
   async function ownerContext() {
-    const profileSnap = await database.ref(`organizers/${currentUser.uid}`).once('value');
+    if (!currentUser) throw new Error('Compte organisateur non connecté.');
+
+    const [profileSnap, organizationsSnap] = await Promise.all([
+      database.ref(`organizers/${currentUser.uid}`).once('value'),
+      database.ref(`userOrganizations/${currentUser.uid}`).once('value')
+    ]);
+
     const profile = profileSnap.val() || {};
-    const organizationsSnap = await database.ref(`userOrganizations/${currentUser.uid}`).once('value');
     const organizations = organizationsSnap.val() || {};
     const organizationId = profile.defaultOrganizationId || Object.keys(organizations)[0] || '';
     if (!organizationId) throw new Error('Aucun espace entreprise sélectionné.');
@@ -45,7 +47,9 @@
     ]);
 
     const organization = organizationSnap.val() || {};
-    if (organization.ownerUid !== currentUser.uid) throw new Error('Seul le propriétaire peut inviter un collaborateur.');
+    if (organization.ownerUid !== currentUser.uid) {
+      throw new Error('Seul le propriétaire peut inviter un collaborateur.');
+    }
 
     return {
       organizationId,
@@ -55,9 +59,9 @@
     };
   }
 
-  async function inviteByEmail(groupId, email) {
-    const normalized = normalizeEmail(email);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+  async function inviteByEmail(groupId, rawEmail) {
+    const email = normalizeEmail(rawEmail);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       throw new Error('Adresse e-mail invalide.');
     }
 
@@ -69,111 +73,120 @@
     const group = context.groups[groupId];
     if (!group) throw new Error('Groupe introuvable.');
 
-    const duplicateMember = Object.values(context.members).find(member => normalizeEmail(member?.email) === normalized);
-    if (duplicateMember) throw new Error('Cette adresse appartient déjà à un membre de l’entreprise.');
+    const alreadyMember = Object.values(context.members)
+      .some(member => normalizeEmail(member && member.email) === email);
+    if (alreadyMember) throw new Error('Cette adresse appartient déjà à un membre de l’entreprise.');
 
-    const key = emailKey(normalized);
-    const inviteId = `${context.organizationId}__${groupId}`;
-    await database.ref(`organizationEmailInvites/${key}/${inviteId}`).set({
-      id: inviteId,
-      email: normalized,
+    const key = emailKey(email);
+    const existingSnap = await database.ref(`organizationEmailInvites/${key}`).once('value');
+    const existing = existingSnap.val();
+    if (existing && existing.status === 'pending') {
+      throw new Error('Une invitation est déjà en attente pour cette adresse.');
+    }
+
+    await database.ref(`organizationEmailInvites/${key}`).set({
+      email,
+      emailKey: key,
       organizationId: context.organizationId,
       organizationName: context.organization.name || 'Entreprise',
       groupId,
       groupName: group.name || 'Groupe',
-      plan: 'enterprise',
-      invitedBy: currentUser.uid,
+      createdBy: currentUser.uid,
       status: 'pending',
       createdAt: firebase.database.ServerValue.TIMESTAMP
     });
   }
 
-  async function acceptEmailInvites(user) {
-    if (!user?.email || processing) return;
-    processing = true;
+  async function acceptEmailInvite(user) {
+    if (!user || !user.email || accepting) return;
+    accepting = true;
+
     try {
-      const normalized = normalizeEmail(user.email);
-      const key = emailKey(normalized);
-      const snap = await database.ref(`organizationEmailInvites/${key}`).once('value');
-      const invites = Object.entries(snap.val() || {});
+      const email = normalizeEmail(user.email);
+      const key = emailKey(email);
+      const inviteSnap = await database.ref(`organizationEmailInvites/${key}`).once('value');
+      const invite = inviteSnap.val();
+      if (!invite || invite.status !== 'pending' || normalizeEmail(invite.email) !== email) return;
 
-      for (const [inviteId, invite] of invites) {
-        if (!invite || invite.status !== 'pending' || normalizeEmail(invite.email) !== normalized) continue;
+      const [membersSnap, groupSnap] = await Promise.all([
+        database.ref(`organizationMembers/${invite.organizationId}`).once('value'),
+        database.ref(`organizationGroups/${invite.organizationId}/${invite.groupId}`).once('value')
+      ]);
 
-        const memberSnap = await database.ref(`organizationMembers/${invite.organizationId}`).once('value');
-        const members = memberSnap.val() || {};
-        if (!members[user.uid] && Object.keys(members).length >= MAX_ACCOUNTS) {
-          console.warn('Invitation Enterprise ignorée : limite de comptes atteinte.');
-          continue;
-        }
-
-        const now = firebase.database.ServerValue.TIMESTAMP;
-        const existingMember = members[user.uid] || {};
-        const groupIds = { ...(existingMember.groupIds || {}), [invite.groupId]: true };
-        const updates = {};
-
-        updates[`organizationMembers/${invite.organizationId}/${user.uid}`] = {
-          uid: user.uid,
-          email: normalized,
-          displayName: user.displayName || normalized,
-          role: existingMember.role === 'owner' ? 'owner' : 'member',
-          groupIds,
-          joinedAt: existingMember.joinedAt || now
-        };
-        updates[`organizationGroupMembers/${invite.organizationId}/${invite.groupId}/${user.uid}`] = {
-          uid: user.uid,
-          email: normalized,
-          role: 'member',
-          joinedAt: now
-        };
-        updates[`userOrganizations/${user.uid}/${invite.organizationId}`] = {
-          role: 'member',
-          name: invite.organizationName,
-          type: 'company',
-          plan: 'enterprise',
-          groupId: invite.groupId,
-          groupName: invite.groupName
-        };
-        updates[`organizers/${user.uid}/plan`] = 'enterprise';
-        updates[`organizers/${user.uid}/enterpriseMember`] = true;
-        updates[`organizers/${user.uid}/defaultOrganizationId`] = invite.organizationId;
-        updates[`organizers/${user.uid}/updatedAt`] = now;
-        updates[`organizationEmailInvites/${key}/${inviteId}/status`] = 'accepted';
-        updates[`organizationEmailInvites/${key}/${inviteId}/acceptedBy`] = user.uid;
-        updates[`organizationEmailInvites/${key}/${inviteId}/acceptedAt`] = now;
-
-        await database.ref().update(updates);
+      const members = membersSnap.val() || {};
+      if (!groupSnap.exists()) throw new Error('Le groupe lié à cette invitation n’existe plus.');
+      if (!members[user.uid] && Object.keys(members).length >= MAX_ACCOUNTS) {
+        throw new Error('Cette entreprise a atteint sa limite de comptes.');
       }
+
+      const now = firebase.database.ServerValue.TIMESTAMP;
+      const existingMember = members[user.uid] || {};
+      const updates = {};
+
+      updates[`organizationMembers/${invite.organizationId}/${user.uid}`] = {
+        uid: user.uid,
+        email,
+        displayName: user.displayName || email,
+        role: existingMember.role === 'owner' ? 'owner' : 'member',
+        groupIds: { ...(existingMember.groupIds || {}), [invite.groupId]: true },
+        joinedAt: existingMember.joinedAt || now
+      };
+      updates[`organizationGroupMembers/${invite.organizationId}/${invite.groupId}/${user.uid}`] = {
+        uid: user.uid,
+        role: 'member',
+        joinedAt: now
+      };
+      updates[`userOrganizations/${user.uid}/${invite.organizationId}`] = {
+        role: 'member',
+        name: invite.organizationName,
+        type: 'company',
+        plan: 'enterprise',
+        groupId: invite.groupId,
+        groupName: invite.groupName
+      };
+      updates[`organizers/${user.uid}/plan`] = 'enterprise';
+      updates[`organizers/${user.uid}/enterpriseMember`] = true;
+      updates[`organizers/${user.uid}/defaultOrganizationId`] = invite.organizationId;
+      updates[`organizers/${user.uid}/updatedAt`] = now;
+      updates[`organizationEmailInvites/${key}/status`] = 'accepted';
+      updates[`organizationEmailInvites/${key}/acceptedBy`] = user.uid;
+      updates[`organizationEmailInvites/${key}/acceptedAt`] = now;
+
+      await database.ref().update(updates);
+      notify(`Accès au groupe ${invite.groupName || 'Entreprise'} activé.`);
     } catch (error) {
-      console.warn('Acceptation automatique de l’invitation Enterprise impossible :', error);
+      console.error('Acceptation de l’invitation Enterprise :', error);
     } finally {
-      processing = false;
+      accepting = false;
     }
   }
 
-  async function decorateGroupInviteButtons() {
-    if (!currentUser) return;
-    const buttons = document.querySelectorAll('[data-invite-group]:not([data-email-invite-ready])');
-    buttons.forEach(button => {
-      button.dataset.emailInviteReady = 'true';
+  function decorateInviteButtons() {
+    document.querySelectorAll('[data-invite-group]:not([data-email-ready])').forEach(button => {
       const groupId = button.dataset.inviteGroup;
+      button.dataset.emailReady = 'true';
+
       const form = document.createElement('form');
       form.className = 'enterprise-inline-form enterprise-email-invite-form';
+      form.dataset.groupId = groupId;
       form.innerHTML = `
-        <input type="email" maxlength="320" autocomplete="email" placeholder="Adresse e-mail du collaborateur" aria-label="Adresse e-mail du collaborateur" required>
+        <input type="email" maxlength="320" autocomplete="email" placeholder="Adresse e-mail du collaborateur" required>
         <button type="submit" class="btn-primary">Inviter</button>`;
+
       button.replaceWith(form);
 
       form.addEventListener('submit', async event => {
         event.preventDefault();
-        const input = form.querySelector('input');
-        const submit = form.querySelector('button');
+        const input = form.querySelector('input[type="email"]');
+        const submit = form.querySelector('button[type="submit"]');
         submit.disabled = true;
+
         try {
-          await inviteByEmail(groupId, input.value);
+          await inviteByEmail(form.dataset.groupId, input.value);
           notify(`Invitation enregistrée pour ${normalizeEmail(input.value)}.`);
           input.value = '';
         } catch (error) {
+          console.error('Invitation Enterprise :', error);
           notify(error.message || 'Invitation impossible.', 'error');
         } finally {
           submit.disabled = false;
@@ -182,21 +195,20 @@
     });
   }
 
-  const observer = new MutationObserver(() => {
-    decorateGroupInviteButtons().catch(error => console.warn(error));
-  });
+  const observer = new MutationObserver(decorateInviteButtons);
 
   firebase.auth().onAuthStateChanged(async user => {
     if (!user || user.isAnonymous) return;
     currentUser = user;
-    await acceptEmailInvites(user);
     const content = document.getElementById('dashboardContent');
     if (content) observer.observe(content, { childList: true, subtree: true });
-    decorateGroupInviteButtons().catch(error => console.warn(error));
+    decorateInviteButtons();
+    await acceptEmailInvite(user);
   });
 
   window.QuizEnterpriseEmailInvites = {
     emailKey,
-    acceptEmailInvites
+    inviteByEmail,
+    acceptEmailInvite
   };
 })();
