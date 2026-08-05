@@ -1,41 +1,93 @@
-// QuizLive — configuration de l’envoi des e-mails de réinitialisation.
+// QuizLive — envoi indépendant des e-mails de réinitialisation via Cloud Functions + Resend.
 (() => {
   'use strict';
 
-  const auth = window.QuizLiveFirebase?.organizerAuth || firebase.auth();
+  const ENDPOINT = 'https://europe-west1-quizlive-app.cloudfunctions.net/requestPasswordReset';
   const normalizeEmail = value => String(value || '').trim().toLowerCase();
 
-  const resetMessages = {
-    'auth/invalid-email': 'Adresse e-mail invalide.',
-    'auth/missing-email': 'Renseignez votre adresse e-mail.',
-    'auth/user-not-found': 'Aucun compte ne correspond à cette adresse e-mail.',
-    'auth/too-many-requests': 'Trop de demandes ont été effectuées. Attendez quelques minutes puis réessayez.',
-    'auth/network-request-failed': 'Connexion impossible. Vérifiez votre accès à Internet.',
-    'auth/unauthorized-continue-uri': 'Le domaine QuizLive doit être ajouté aux domaines autorisés dans Firebase.',
-    'auth/invalid-continue-uri': 'L’adresse de retour configurée pour QuizLive est invalide.',
-    'auth/expired-action-code': 'Ce lien a expiré. Demandez un nouveau lien.',
-    'auth/invalid-action-code': 'Ce lien n’est plus valide. Utilisez le dernier e-mail reçu.'
-  };
-
   function language() {
-    const selected = window.QuizI18n?.getLanguage?.() || localStorage.getItem('quizliveLanguage') || document.documentElement.lang || 'fr';
+    const selected = window.QuizI18n?.getLanguage?.()
+      || localStorage.getItem('quizliveLanguage')
+      || document.documentElement.lang
+      || 'fr';
     return String(selected).toLowerCase().startsWith('en') ? 'en' : 'fr';
   }
 
-  function continueUrl() {
-    return new URL('login.html?passwordReset=success', location.href).href;
+  function messageForStatus(status) {
+    const english = language() === 'en';
+    const messages = {
+      400: english ? 'Enter a valid email address.' : 'Renseignez une adresse e-mail valide.',
+      429: english
+        ? 'A request was recently sent. Wait one minute before trying again.'
+        : 'Une demande a été envoyée récemment. Attendez une minute avant de réessayer.',
+      503: english
+        ? 'The reset service is temporarily unavailable. Please try again later.'
+        : 'Le service de réinitialisation est temporairement indisponible. Réessayez plus tard.'
+    };
+    return messages[status]
+      || (english
+        ? 'Unable to send the reset email.'
+        : 'Impossible d’envoyer l’e-mail de réinitialisation.');
   }
 
   async function sendPasswordReset(email) {
     const value = normalizeEmail(email);
-    if (!value) throw new Error(language() === 'en' ? 'Enter your email address.' : 'Renseignez votre adresse e-mail.');
+    if (!value) {
+      throw new Error(language() === 'en'
+        ? 'Enter your email address.'
+        : 'Renseignez votre adresse e-mail.');
+    }
 
-    auth.languageCode = language();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
 
-    await auth.sendPasswordResetEmail(value, {
-      url: continueUrl(),
-      handleCodeInApp: false
-    });
+    try {
+      const response = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          email: value,
+          language: language(),
+          website: ''
+        }),
+        signal: controller.signal,
+        cache: 'no-store',
+        credentials: 'omit'
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result.ok !== true) {
+        const error = new Error(result.message || messageForStatus(response.status));
+        error.code = `password-reset/http-${response.status}`;
+        throw error;
+      }
+
+      return result;
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        const timeoutError = new Error(language() === 'en'
+          ? 'The reset service did not respond. Please try again.'
+          : 'Le service de réinitialisation ne répond pas. Réessayez.');
+        timeoutError.code = 'password-reset/timeout';
+        throw timeoutError;
+      }
+
+      if (error instanceof TypeError) {
+        const networkError = new Error(language() === 'en'
+          ? 'The reset service is not deployed or cannot be reached.'
+          : 'Le service de réinitialisation n’est pas encore déployé ou reste inaccessible.');
+        networkError.code = 'password-reset/network';
+        throw networkError;
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   function install() {
@@ -44,10 +96,15 @@
     const previousAuthMessage = window.QuizOrganizer.authMessage;
     window.QuizOrganizer.sendPasswordReset = sendPasswordReset;
     window.QuizOrganizer.authMessage = error => {
-      return resetMessages[error?.code]
-        || previousAuthMessage?.(error)
+      if (String(error?.code || '').startsWith('password-reset/')) {
+        return error.message;
+      }
+
+      return previousAuthMessage?.(error)
         || error?.message
-        || (language() === 'en' ? 'Unable to send the reset email.' : 'Impossible d’envoyer l’e-mail de réinitialisation.');
+        || (language() === 'en'
+          ? 'Unable to send the reset email.'
+          : 'Impossible d’envoyer l’e-mail de réinitialisation.');
     };
     return true;
   }
@@ -60,7 +117,8 @@
   }
 
   window.QuizLivePasswordResetMail = {
-    version: '79',
+    version: '80',
+    endpoint: ENDPOINT,
     sendPasswordReset
   };
 })();
