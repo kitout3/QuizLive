@@ -9,6 +9,7 @@
   const successBox = document.getElementById('authPageSuccess');
   const submitButton = document.getElementById('authSubmit');
   const googleButton = document.getElementById('authGoogle');
+  let resetCooldownTimer = null;
 
   function safeReturnUrl() {
     const params = new URLSearchParams(location.search);
@@ -58,6 +59,31 @@
     button.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
   }
 
+  function resetRequestLabel(seconds) {
+    const english = window.QuizI18n?.getLanguage?.() === 'en';
+    return english ? `Send again in ${seconds}s` : `Renvoyer dans ${seconds} s`;
+  }
+
+  function startResetCooldown(seconds = 60) {
+    if (!submitButton) return;
+    clearInterval(resetCooldownTimer);
+    let remaining = seconds;
+    submitButton.disabled = true;
+    submitButton.textContent = resetRequestLabel(remaining);
+
+    resetCooldownTimer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(resetCooldownTimer);
+        resetCooldownTimer = null;
+        submitButton.disabled = false;
+        submitButton.textContent = window.QuizI18n?.getLanguage?.() === 'en' ? 'Send a new link' : 'Envoyer un nouveau lien';
+        return;
+      }
+      submitButton.textContent = resetRequestLabel(remaining);
+    }, 1000);
+  }
+
   async function googleAuth() {
     setError('');
     googleButton.disabled = true;
@@ -76,13 +102,17 @@
 
   async function submit(event) {
     event.preventDefault();
+    if (page === 'forgot' && resetCooldownTimer) return;
+
     setError('');
     setSuccess('');
     submitButton.disabled = true;
+
     try {
       const organizer = await waitForOrganizer();
       const email = document.getElementById('authEmail')?.value.trim() || '';
       const password = document.getElementById('authPassword')?.value || '';
+
       if (page === 'login') {
         await organizer.loginOrganizer(email, password);
         goBackToRequestedPage();
@@ -94,8 +124,8 @@
         goBackToRequestedPage();
       } else if (page === 'forgot') {
         await organizer.sendPasswordReset(email);
-        setSuccess('Un lien de réinitialisation a été envoyé. Vérifiez aussi les courriers indésirables.');
-        submitButton.disabled = false;
+        setSuccess('Un seul lien vient d’être envoyé. Ouvrez le dernier e-mail reçu et vérifiez également les courriers indésirables.');
+        startResetCooldown(60);
       }
     } catch (error) {
       setError(friendly(error));
@@ -106,6 +136,7 @@
   document.getElementById('authForm')?.addEventListener('submit', submit);
   document.getElementById('authEye')?.addEventListener('click', togglePassword);
   googleButton?.addEventListener('click', googleAuth);
+
   firebase.auth().onAuthStateChanged(user => {
     if (user && !user.isAnonymous && page !== 'forgot') goBackToRequestedPage();
   });
