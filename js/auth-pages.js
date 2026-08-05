@@ -84,6 +84,12 @@
     }, 1000);
   }
 
+  function resetSuccessMessage() {
+    return window.QuizI18n?.getLanguage?.() === 'en'
+      ? 'If an account matches this address, a secure QuizLive email has been sent. Use only the most recent email received.'
+      : 'Si un compte correspond à cette adresse, un e-mail QuizLive sécurisé a été envoyé. Utilisez uniquement le message le plus récent.';
+  }
+
   async function googleAuth() {
     setError('');
     googleButton.disabled = true;
@@ -124,7 +130,7 @@
         goBackToRequestedPage();
       } else if (page === 'forgot') {
         await organizer.sendPasswordReset(email);
-        setSuccess('Un seul lien vient d’être envoyé. Ouvrez le dernier e-mail reçu et vérifiez également les courriers indésirables.');
+        setSuccess(resetSuccessMessage());
         startResetCooldown(60);
       }
     } catch (error) {
