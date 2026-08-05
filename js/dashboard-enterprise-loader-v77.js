@@ -19,8 +19,10 @@
 
   function loadScript(src, marker) {
     return new Promise((resolve, reject) => {
-      if (document.querySelector(`script[data-enterprise-module="${marker}"]`)) {
-        resolve();
+      const existing = document.querySelector(`script[data-enterprise-module="${marker}"]`);
+      if (existing) {
+        if (existing.dataset.loaded === 'true') resolve();
+        else existing.addEventListener('load', resolve, { once: true });
         return;
       }
 
@@ -28,7 +30,10 @@
       script.src = src;
       script.dataset.enterpriseModule = marker;
       script.async = false;
-      script.onload = resolve;
+      script.onload = () => {
+        script.dataset.loaded = 'true';
+        resolve();
+      };
       script.onerror = reject;
       document.body.appendChild(script);
     });
@@ -39,15 +44,19 @@
     loaded = true;
 
     const modules = [
-      ['js/dashboard-enterprise-groups.js?v=77', 'groups'],
-      ['js/enterprise-invite-form-v1.js?v=77', 'invite-form'],
-      ['js/enterprise-access-view.js?v=77', 'access-view'],
-      ['js/enterprise-delete-icons.js?v=77', 'delete-icons'],
-      ['js/enterprise-management-v2.js?v=77', 'management']
+      ['js/dashboard-enterprise-groups.js?v=78', 'groups-v78'],
+      ['js/enterprise-invite-form-v1.js?v=78', 'invite-form-v78'],
+      ['js/enterprise-access-view.js?v=78', 'access-view-v78'],
+      ['js/enterprise-delete-icons.js?v=78', 'delete-icons-v78'],
+      ['js/enterprise-management-v2.js?v=78', 'management-v78']
     ];
 
     try {
-      for (const [src, marker] of modules) await loadScript(src, marker);
+      for (const [src, marker] of modules) {
+        await loadScript(src, marker);
+      }
+
+      window.QuizLiveEnterpriseDeleteIcons?.refresh?.();
     } catch (error) {
       loaded = false;
       console.error('Chargement de l’espace entreprise impossible :', error);
