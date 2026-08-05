@@ -1,1 +1,181 @@
-.enterprise-group-card{position:relative}.enterprise-icon-delete{display:inline-grid;place-items:center;flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(255,255,255,.12);border-radius:50%;background:rgba(255,255,255,.045);color:rgba(255,255,255,.62);font-family:Arial,sans-serif;font-size:21px;font-weight:400;line-height:1;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,opacity .18s ease}.enterprise-icon-delete:hover,.enterprise-icon-delete:focus-visible{background:rgba(239,68,68,.14);border-color:rgba(248,113,113,.42);color:#fca5a5;transform:scale(1.06);outline:none}.enterprise-icon-delete:active{transform:scale(.96)}.enterprise-group-delete{position:absolute;top:12px;right:12px;width:32px;height:32px}.enterprise-access-management .dashboard-choice-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.enterprise-access-management .dashboard-choice-row>span{min-width:0;display:grid;gap:2px}.enterprise-access-management .dashboard-choice-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.enterprise-access-management>[data-delete-group]{margin-top:0!important}.enterprise-access-management .enterprise-group-delete{position:absolute}.enterprise-access-management{display:grid;gap:8px}.enterprise-group-card h3{padding-right:42px}@media(max-width:760px){.enterprise-icon-delete{width:34px;height:34px;font-size:23px}.enterprise-group-delete{top:10px;right:10px}.enterprise-access-management .dashboard-choice-row{align-items:center}}
+.enterprise-group-card {
+  position: relative;
+  overflow: visible;
+}
+
+.enterprise-icon-delete,
+.enterprise-access-management [data-delete-invite]:not(.enterprise-icon-delete),
+.enterprise-access-management [data-remove-member]:not(.enterprise-icon-delete),
+.enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete) {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 50%;
+  background: rgba(255,255,255,.055);
+  color: rgba(255,255,255,.68);
+  font-family: Arial, sans-serif;
+  font-size: 21px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    background .18s ease,
+    border-color .18s ease,
+    color .18s ease,
+    transform .18s ease,
+    opacity .18s ease;
+}
+
+.enterprise-icon-delete:hover,
+.enterprise-icon-delete:focus-visible,
+.enterprise-access-management [data-delete-invite]:not(.enterprise-icon-delete):hover,
+.enterprise-access-management [data-remove-member]:not(.enterprise-icon-delete):hover,
+.enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete):hover {
+  background: rgba(239,68,68,.15);
+  border-color: rgba(248,113,113,.46);
+  color: #fca5a5;
+  transform: scale(1.06);
+  outline: none;
+}
+
+.enterprise-icon-delete:active {
+  transform: scale(.96);
+}
+
+.enterprise-icon-delete:disabled {
+  cursor: wait;
+  opacity: .48;
+  transform: none;
+}
+
+.enterprise-group-delete,
+.enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete) {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  margin: 0 !important;
+}
+
+.enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete) {
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+}
+
+.enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete)::before {
+  content: '×';
+  color: rgba(255,255,255,.68);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete):hover::before {
+  color: #fca5a5;
+}
+
+.enterprise-access-management {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.enterprise-access-management .dashboard-choice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.enterprise-access-management .dashboard-choice-row > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.enterprise-access-management .dashboard-choice-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enterprise-access-management > [data-delete-group] {
+  margin-top: 0 !important;
+}
+
+.enterprise-group-card h3 {
+  padding-right: 46px;
+}
+
+.enterprise-email-invite-form {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.enterprise-email-invite-form input {
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 12px;
+  background: rgba(9,14,29,.74);
+  color: #fff;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.enterprise-email-invite-form input:focus {
+  border-color: rgba(139,92,246,.8);
+  background: rgba(12,18,36,.92);
+  box-shadow: 0 0 0 3px rgba(139,92,246,.14);
+}
+
+.enterprise-email-invite-form .btn-primary {
+  width: auto;
+  min-width: 78px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width:760px) {
+  .enterprise-icon-delete,
+  .enterprise-access-management [data-delete-invite]:not(.enterprise-icon-delete),
+  .enterprise-access-management [data-remove-member]:not(.enterprise-icon-delete) {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    font-size: 23px;
+  }
+
+  .enterprise-group-delete,
+  .enterprise-access-management [data-delete-group]:not(.enterprise-icon-delete) {
+    top: 12px;
+    right: 12px;
+  }
+
+  .enterprise-access-management .dashboard-choice-row {
+    align-items: center;
+  }
+
+  .enterprise-email-invite-form {
+    grid-template-columns: 1fr;
+  }
+
+  .enterprise-email-invite-form .btn-primary {
+    width: 100%;
+  }
+}
