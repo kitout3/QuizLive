@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuizLive - Administration</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=82">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body data-page="admin">
@@ -81,7 +81,7 @@
             <div id="questionList" class="question-list"></div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px;">
                 <button class="add-question-btn" onclick="showAddQuestionModal()">+ Ajouter une question</button>
-                <button class="add-question-btn" onclick="showImportSlidesModal()" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">🖼️ Importer des slides</button>
+                <button class="add-question-btn" onclick="showImportSlidesModal()" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">📄 Importer PDF</button>
                 <button class="import-excel-btn" onclick="showImportExcelModal()">📊 Importer Excel</button>
                 <button class="add-question-btn" onclick="showSaveModal()" style="border-color: var(--accent); color: var(--accent);">💾 Sauvegarder / Charger</button>
             </div>
@@ -173,16 +173,16 @@
     <div id="importSlidesModal" class="modal">
         <div class="modal-content" style="max-width: 550px;">
             <button class="modal-close" onclick="closeModals()">&times;</button>
-            <h2>🖼️ Importer des slides</h2>
+            <h2>📄 Importer un PDF</h2>
             <div class="import-instructions">
-                <p style="color: var(--text-secondary); margin-bottom: 16px;">Importez des images de vos slides PowerPoint pour les afficher entre les questions.</p>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">💡 Astuce : Exportez vos slides PowerPoint en images (PNG/JPG) avant de les importer ici.<br>Dans PowerPoint : Fichier → Exporter → Images</p>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">Exportez votre présentation PowerPoint directement au format PDF, puis importez ce PDF dans QuizLive. Chaque page du PDF deviendra automatiquement une slide.</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.6;">💡 Dans PowerPoint : <strong>Fichier → Exporter → Créer un document PDF/XPS</strong>.<br>Vous n’avez plus besoin d’exporter les slides en PNG ou JPG.</p>
             </div>
             <div class="form-group" style="margin-top: 24px;">
-                <label class="file-input-label" for="slidesFileInput">📁 Sélectionner des images</label>
-                <input type="file" id="slidesFileInput" accept="image/*" multiple onchange="handleSlidesImport(event)" style="display: none;">
+                <label class="file-input-label" for="slidesFileInput">📄 Sélectionner un fichier PDF</label>
+                <input type="file" id="slidesFileInput" accept="application/pdf,.pdf" onchange="handleSlidesImport(event)" style="display: none;">
             </div>
-            <button id="importSlidesBtn" class="btn-primary" onclick="document.getElementById('slidesFileInput').click()">Sélectionner les images</button>
+            <button id="importSlidesBtn" class="btn-primary" onclick="document.getElementById('slidesFileInput').click()">Sélectionner le PDF</button>
         </div>
     </div>
 
@@ -209,8 +209,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="js/config.js?v=69"></script>
-    <script src="js/admin-group-access-v1.js?v=69"></script>
-    <script src="js/app.js?v=69"></script>
+    <script src="js/config.js?v=82"></script>
+    <script src="js/admin-group-access-v1.js?v=82"></script>
+    <script src="js/app.js?v=82"></script>
+    <script src="js/pdf-slide-import-v81.js?v=82"></script>
 </body>
 </html>
