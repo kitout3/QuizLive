@@ -8,15 +8,10 @@ const firebaseConfig = {
 
 const ADMIN_UID_CONFIG = "7DEy3WkKdQgbz7Kh7KCIrScb2el2";
 
-// Instance principale : comptes organisateurs (email / mot de passe).
 const organizerApp = firebase.apps.find(app => app.name === '[DEFAULT]') || firebase.initializeApp(firebaseConfig);
 const organizerDatabase = organizerApp.database();
 const organizerAuth = organizerApp.auth();
 
-// Instance secondaire : participants anonymes.
-// Une application Firebase nommée utilise un stockage Auth distinct de l'instance
-// principale. Un participant peut donc rejoindre depuis le même navigateur sans
-// remplacer ni déconnecter le compte organisateur.
 const PARTICIPANT_APP_NAME = 'quizlive-participant';
 const participantApp = firebase.apps.find(app => app.name === PARTICIPANT_APP_NAME)
   || firebase.initializeApp(firebaseConfig, PARTICIPANT_APP_NAME);
@@ -33,14 +28,23 @@ window.QuizLiveFirebase = {
   participantDatabase
 };
 
-// Le code historique utilise la constante globale `database`.
-// Sur la page joueur, elle doit impérativement pointer vers l'instance participante
-// afin que les réponses soient écrites avec l'UID anonyme et non l'UID organisateur.
 const database = document.body?.dataset?.page === 'player'
   ? participantDatabase
   : organizerDatabase;
 
-// Charge une seule couche de traduction FR / EN sur toutes les pages utilisant config.js.
+function loadQuizLiveScript(src, marker, readyTest) {
+  if (readyTest?.()) return;
+  if (document.querySelector(`script[data-quizlive-module="${marker}"]`)) return;
+
+  const script = document.createElement('script');
+  script.src = src;
+  script.dataset.quizliveModule = marker;
+  script.async = false;
+  script.onerror = error => console.error(`Chargement du module ${marker} impossible :`, error);
+  (document.body || document.head || document.documentElement).appendChild(script);
+}
+
+// Traduction globale FR / EN.
 (() => {
   const version = '76';
 
@@ -48,17 +52,13 @@ const database = document.body?.dataset?.page === 'player'
     if (
       window.QuizI18nCoverage?.version === version ||
       document.querySelector(`script[data-quizlive-i18n-coverage="${version}"]`)
-    ) {
-      return;
-    }
+    ) return;
 
     const coverage = document.createElement('script');
     coverage.src = `js/i18n-coverage-v76.js?v=${version}`;
     coverage.dataset.quizliveI18nCoverage = version;
     coverage.async = false;
-    coverage.onerror = error => {
-      console.error('Chargement de la couverture de traduction QuizLive impossible :', error);
-    };
+    coverage.onerror = error => console.error('Chargement de la couverture de traduction QuizLive impossible :', error);
     (document.head || document.documentElement).appendChild(coverage);
   };
 
@@ -78,40 +78,49 @@ const database = document.body?.dataset?.page === 'player'
   script.dataset.quizliveI18n = version;
   script.async = false;
   script.addEventListener('load', loadCoverage, { once: true });
-  script.onerror = error => {
-    console.error('Chargement de la traduction QuizLive impossible :', error);
-  };
-
+  script.onerror = error => console.error('Chargement de la traduction QuizLive impossible :', error);
   (document.head || document.documentElement).appendChild(script);
 })();
 
-// L'administration remplace l'ancien import d'images par l'import direct d'un PDF.
-// Le module est chargé après tous les scripts historiques pour pouvoir surcharger
-// handleSlidesImport() et showImportSlidesModal() sans modifier app.js.
+// Modules fonctionnels récents.
 (() => {
-  if (document.body?.dataset?.page !== 'admin') return;
+  const page = document.body?.dataset?.page || '';
 
-  const loadPdfImport = () => {
-    if (
-      window.QuizLivePdfSlideImport?.version === '81' ||
-      document.querySelector('script[data-quizlive-pdf-import="81"]')
-    ) {
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'js/pdf-slide-import-v81.js?v=81';
-    script.dataset.quizlivePdfImport = '81';
-    script.async = false;
-    script.onerror = error => {
-      console.error('Chargement de l’import PDF QuizLive impossible :', error);
-    };
-    document.body.appendChild(script);
+  const afterWindowLoad = callback => {
+    if (document.readyState === 'complete') callback();
+    else window.addEventListener('load', callback, { once: true });
   };
 
-  if (document.readyState === 'complete') {
-    loadPdfImport();
-  } else {
-    window.addEventListener('load', loadPdfImport, { once: true });
+  if (page === 'admin') {
+    afterWindowLoad(() => {
+      loadQuizLiveScript(
+        'js/pdf-slide-import-v81.js?v=83',
+        'pdf-import-83',
+        () => window.QuizLivePdfSlideImport?.version === '81'
+      );
+      loadQuizLiveScript(
+        'js/image-question-v83.js?v=83',
+        'image-question-83',
+        () => window.QuizLiveImageQuestions?.version === '83'
+      );
+    });
+  }
+
+  if (page === 'player' || page === 'presenter') {
+    afterWindowLoad(() => {
+      loadQuizLiveScript(
+        'js/image-question-v83.js?v=83',
+        'image-question-83',
+        () => window.QuizLiveImageQuestions?.version === '83'
+      );
+    });
+  }
+
+  if (page === 'dashboard') {
+    loadQuizLiveScript(
+      'js/dashboard-quiz-loading-v83.js?v=83',
+      'quiz-loading-83',
+      () => window.QuizLiveQuizLoadingGuard?.version === '83'
+    );
   }
 })();
