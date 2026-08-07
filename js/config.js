@@ -84,3 +84,34 @@ const database = document.body?.dataset?.page === 'player'
 
   (document.head || document.documentElement).appendChild(script);
 })();
+
+// L'administration remplace l'ancien import d'images par l'import direct d'un PDF.
+// Le module est chargé après tous les scripts historiques pour pouvoir surcharger
+// handleSlidesImport() et showImportSlidesModal() sans modifier app.js.
+(() => {
+  if (document.body?.dataset?.page !== 'admin') return;
+
+  const loadPdfImport = () => {
+    if (
+      window.QuizLivePdfSlideImport?.version === '81' ||
+      document.querySelector('script[data-quizlive-pdf-import="81"]')
+    ) {
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'js/pdf-slide-import-v81.js?v=81';
+    script.dataset.quizlivePdfImport = '81';
+    script.async = false;
+    script.onerror = error => {
+      console.error('Chargement de l’import PDF QuizLive impossible :', error);
+    };
+    document.body.appendChild(script);
+  };
+
+  if (document.readyState === 'complete') {
+    loadPdfImport();
+  } else {
+    window.addEventListener('load', loadPdfImport, { once: true });
+  }
+})();
