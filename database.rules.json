@@ -135,31 +135,31 @@
         "participants": {
           "$participantId": {
             ".read": true,
-            ".write": true,
+            ".write": "(data.exists() && newData.exists()) || (!data.exists() && newData.exists() && (root.child('sessions').child($code).child('participants').numChildren() < 10 || (root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('plan').val() === 'pro' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'inactive' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'canceled' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'cancelled' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'expired' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'unpaid' && root.child('sessions').child($code).child('participants').numChildren() < 50) || (root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('plan').val() === 'business' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'inactive' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'canceled' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'cancelled' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'expired' && root.child('subscriptions').child(root.child('sessions').child($code).child('ownerUid').val()).child('status').val() !== 'unpaid' && root.child('sessions').child($code).child('participants').numChildren() < 200) || (root.child('sessions').child($code).child('organizationId').isString() && root.child('sessions').child($code).child('groupId').isString() && (root.child('organizations').child(root.child('sessions').child($code).child('organizationId').val()).child('ownerUid').val() === root.child('sessions').child($code).child('ownerUid').val() || root.child('organizationMembers').child(root.child('sessions').child($code).child('organizationId').val()).child(root.child('sessions').child($code).child('ownerUid').val()).child('groupIds').child(root.child('sessions').child($code).child('groupId').val()).val() === true || root.child('organizationGroupMembers').child(root.child('sessions').child($code).child('organizationId').val()).child(root.child('sessions').child($code).child('groupId').val()).child(root.child('sessions').child($code).child('ownerUid').val()).exists()) && root.child('sessions').child($code).child('participants').numChildren() < 500)))",
             ".validate": "!newData.exists() || (newData.hasChildren(['id','name','joinedAt']) && newData.child('id').val() === $participantId && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 30 && newData.child('joinedAt').isNumber())",
             "answers": {
               "$questionIndex": {
-                ".write": true
+                ".write": "root.child('sessions').child($code).child('participants').child($participantId).exists()"
               }
             },
             "answerTimes": {
               "$questionIndex": {
-                ".write": true
+                ".write": "root.child('sessions').child($code).child('participants').child($participantId).exists()"
               }
             },
             "answerPoints": {
               "$questionIndex": {
-                ".write": true
+                ".write": "root.child('sessions').child($code).child('participants').child($participantId).exists()"
               }
             },
             "score": {
-              ".write": true
+              ".write": "root.child('sessions').child($code).child('participants').child($participantId).exists()"
             },
             "connected": {
-              ".write": true
+              ".write": "root.child('sessions').child($code).child('participants').child($participantId).exists()"
             },
             "lastSeenAt": {
-              ".write": true
+              ".write": "root.child('sessions').child($code).child('participants').child($participantId).exists()"
             }
           }
         }
