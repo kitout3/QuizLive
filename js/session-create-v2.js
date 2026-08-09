@@ -3,7 +3,7 @@
 
   const auth = window.QuizLiveFirebase?.organizerAuth || firebase.auth();
   const db = window.QuizLiveFirebase?.organizerDatabase || database;
-  const ADMIN_BOOT_VERSION = '86';
+  const ADMIN_BOOT_VERSION = '87';
 
   function generateCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -130,7 +130,7 @@
       const sessionName = document.getElementById('sessionName')?.value || '';
       const adminName = document.getElementById('adminName')?.value || '';
       const sessionCode = await createSession(sessionName, adminName);
-      window.location.assign(`admin.html?code=${encodeURIComponent(sessionCode)}&v=${ADMIN_BOOT_VERSION}`);
+      window.location.assign(`admin.html?code=${encodeURIComponent(sessionCode)}&v=${ADMIN_BOOT_VERSION}&fresh=${Date.now()}`);
     } catch (error) {
       console.error('Création de session :', error);
       if (typeof window.showToast === 'function') {
@@ -149,7 +149,7 @@
       const pending = JSON.parse(pendingRaw);
       const sessionCode = await createSession(pending.sessionName, pending.adminName);
       localStorage.removeItem('pendingSession');
-      history.replaceState({}, '', `admin.html?code=${encodeURIComponent(sessionCode)}&v=${ADMIN_BOOT_VERSION}`);
+      history.replaceState({}, '', `admin.html?code=${encodeURIComponent(sessionCode)}&v=${ADMIN_BOOT_VERSION}&fresh=${Date.now()}`);
       return sessionCode;
     } catch (error) {
       console.error('Création après authentification :', error);
