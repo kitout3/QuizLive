@@ -163,4 +163,15 @@
   };
   window.handleSlidesImport = handlePdfImport;
   window.QuizLivePdfSlideImport = { version: VERSION, import: handlePdfImport };
+
+  // Extension légère chargée après app.js et le module Image.
+  // Elle ne participe pas au démarrage du quiz : elle ne fait qu'ajouter les croix
+  // et la gestion de 1 à 4 choix dans les formulaires QCM/Image.
+  if (!window.QuizLiveVariableChoices?.version && !document.querySelector('script[data-quizlive-variable-choices]')) {
+    const script = document.createElement('script');
+    script.src = 'js/variable-choice-count-v89.js?v=89';
+    script.async = false;
+    script.dataset.quizliveVariableChoices = '89';
+    document.head.appendChild(script);
+  }
 })();
