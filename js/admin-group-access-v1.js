@@ -1,11 +1,10 @@
 (() => {
   'use strict';
 
-  const VERSION = '85';
+  const VERSION = '86';
   const ACCESS_TIMEOUT_MS = 8000;
   const APP_READY_TIMEOUT_MS = 8000;
 
-  // Désactive immédiatement l'ancien garde mono-admin de app.js.
   const originalPage = document.body?.dataset?.page || 'admin';
   if (document.body) document.body.dataset.page = 'admin-access-pending';
 
@@ -15,6 +14,9 @@
   let initializedCode = '';
   let booting = false;
   let authResolved = false;
+  let liveRef = null;
+  let liveHandler = null;
+  let liveErrorHandler = null;
 
   function withTimeout(promise, timeout, label) {
     let timer;
@@ -113,19 +115,67 @@
 
   function showDenied(message) {
     setBootStatus(message || 'Vous n’avez pas accès à ce quiz.', true);
-    if (typeof window.showAdminLogin === 'function') window.showAdminLogin(true);
-    if (typeof window.setLoginError === 'function') {
-      window.setLoginError(message || 'Vous n’avez pas accès à ce quiz.');
-    }
+    window.showAdminLogin?.(true);
+    window.setLoginError?.(message || 'Vous n’avez pas accès à ce quiz.');
   }
 
   async function waitForAppFunctions() {
     const startedAt = Date.now();
     while (Date.now() - startedAt < APP_READY_TIMEOUT_MS) {
-      if (typeof window.initAdmin === 'function') return true;
+      if (
+        typeof window.updateAdminUI === 'function' &&
+        typeof window.bindAdminLoginUI === 'function'
+      ) return true;
       await new Promise(resolve => setTimeout(resolve, 40));
     }
     return false;
+  }
+
+  function renderSession(session, code) {
+    try {
+      currentSession = session || {};
+      currentSession.code = code;
+      window.updateAdminUI();
+      return true;
+    } catch (error) {
+      console.error(`[Admin render ${VERSION}]`, error);
+      setBootStatus('Impossible d’afficher le quiz. Rechargez la page.', true);
+      return false;
+    }
+  }
+
+  function detachRealtimeListener() {
+    if (liveRef && liveHandler) {
+      liveRef.off('value', liveHandler);
+    }
+    liveRef = null;
+    liveHandler = null;
+    liveErrorHandler = null;
+  }
+
+  function attachRealtimeListener(code) {
+    detachRealtimeListener();
+
+    liveRef = db.ref(`sessions/${code}`);
+    liveHandler = snapshot => {
+      if (!snapshot.exists()) {
+        setBootStatus('Ce quiz n’existe plus.', true);
+        detachRealtimeListener();
+        return;
+      }
+      renderSession(snapshot.val() || {}, code);
+    };
+    liveErrorHandler = error => {
+      console.error(`[Admin realtime ${VERSION}]`, error);
+      setBootStatus(
+        error?.code === 'PERMISSION_DENIED'
+          ? 'Accès Firebase refusé pour ce quiz. Vérifiez les règles de la base.'
+          : (error?.message || 'La synchronisation du quiz a échoué.'),
+        true
+      );
+    };
+
+    liveRef.on('value', liveHandler, liveErrorHandler);
   }
 
   async function startAuthorizedAdmin(user) {
@@ -134,15 +184,13 @@
 
     const code = codeFromUrl();
     if (!code) {
-      location.replace('dashboard.html?section=quizzes&v=85');
+      location.replace('dashboard.html?section=quizzes&v=86');
       return;
     }
 
     setBootStatus('Chargement du quiz…');
 
     try {
-      // Lecture unique d'abord : elle vérifie à la fois l'existence et évite de
-      // refaire cette lecture pour le contrôle d'accès du propriétaire.
       const session = await readSession(code);
       const allowed = await canManageSession(user, code, session);
 
@@ -156,17 +204,19 @@
         throw new Error('Le moteur du quiz ne s’est pas chargé correctement.');
       }
 
-      if (document.body) {
-        document.body.dataset.page = originalPage === 'admin-access-pending' ? 'admin' : originalPage;
-      }
+      if (document.body) document.body.dataset.page = 'admin';
 
       window.bindAdminLoginUI?.();
       window.setLoginError?.('');
       window.showAdminLogin?.(false);
 
+      // Affichage immédiat avec la session déjà lue : plus de deuxième lecture
+      // obligatoire avant de quitter l’écran « Chargement du quiz… ».
+      if (!renderSession(session, code)) return;
+
       if (initializedCode !== code) {
         initializedCode = code;
-        window.initAdmin();
+        attachRealtimeListener(code);
       }
     } catch (error) {
       console.error(`[Admin boot ${VERSION}]`, error);
@@ -185,6 +235,7 @@
     authResolved = true;
 
     if (!user || user.isAnonymous) {
+      detachRealtimeListener();
       setBootStatus('Connexion organisateur requise.', true);
       window.bindAdminLoginUI?.();
       window.showAdminLogin?.(true);
@@ -195,25 +246,24 @@
     startAuthorizedAdmin(user);
   }
 
-  // Ne plus attendre window.load : Firebase Auth commence dès que le script est lu.
   auth.onAuthStateChanged(handleAuth, error => {
     authResolved = true;
     console.error(`[Admin auth ${VERSION}]`, error);
     setBootStatus('Impossible de vérifier votre connexion.', true);
   });
 
-  // Le formulaire de connexion peut être lié dès que app.js expose ses fonctions.
   (async () => {
     await waitForAppFunctions();
     window.bindAdminLoginUI?.();
   })();
 
-  // Garde ultime : aucune page ne doit rester silencieusement bloquée.
   setTimeout(() => {
     if (!authResolved) {
       setBootStatus('La vérification de connexion prend trop de temps.', true);
     }
   }, 10000);
+
+  window.addEventListener('beforeunload', detachRealtimeListener);
 
   window.QuizLiveAdminAccess = {
     version: VERSION,
