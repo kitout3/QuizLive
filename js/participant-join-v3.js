@@ -1,7 +1,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '5.0.0';
+  const VERSION = '6.0.0';
+  const DEFAULT_LIMIT = 10;
+  const PLAN_BY_LIMIT = {
+    10: 'Free',
+    50: 'Pro',
+    200: 'Business',
+    500: 'Enterprise'
+  };
   let joining = false;
 
   const normalizeCode = value => String(value || '')
@@ -31,11 +38,37 @@
     else alert(text);
   }
 
+  function participantLimit(session) {
+    const value = Number(session?.maxParticipants);
+    if (!Number.isFinite(value) || value < 1) return DEFAULT_LIMIT;
+    return Math.max(1, Math.min(500, Math.floor(value)));
+  }
+
+  function participantCount(session) {
+    return Object.keys(session?.participants || {}).length;
+  }
+
+  function limitReachedError(limit) {
+    const plan = PLAN_BY_LIMIT[limit];
+    const suffix = plan ? ` du forfait ${plan}` : '';
+    const error = new Error(`Cette session a atteint la limite de ${limit} participants${suffix}.`);
+    error.code = 'quizlive/participant-limit-reached';
+    error.participantLimit = limit;
+    return error;
+  }
+
   function readableError(error, step) {
     const code = String(error?.code || '').toLowerCase();
     console.error(`[Participant ${VERSION}] ${step}`, error);
+
+    if (code === 'quizlive/participant-limit-reached') {
+      return error.message;
+    }
     if (code.includes('permission-denied') || code.includes('permission_denied')) {
-      return `Accès Firebase refusé pendant l’étape « ${step} ». Publiez les règles database.rules.json version 5.`;
+      if (step === 'inscription du participant') {
+        return 'Impossible de rejoindre : la limite de participants autorisée par le forfait de l’organisateur est atteinte.';
+      }
+      return `Accès Firebase refusé pendant l’étape « ${step} ».`;
     }
     if (code.includes('network-request-failed')) {
       return 'Connexion réseau interrompue. Réessayez.';
@@ -70,7 +103,8 @@
       const db = participantDatabaseService();
 
       step = 'lecture de la session';
-      await readSessionMetadata(db, code);
+      const session = await readSessionMetadata(db, code);
+      const maxParticipants = participantLimit(session);
 
       const previous = (() => {
         try { return JSON.parse(sessionStorage.getItem('quizSession') || '{}'); }
@@ -85,15 +119,32 @@
       const participantRef = db.ref(`sessions/${code}/participants/${participantId}`);
       const existingSnap = await participantRef.once('value');
       const existing = existingSnap.val() || {};
-      const now = Date.now();
 
-      await participantRef.set({
-        id: participantId,
-        name,
-        joinedAt: Number(existing.joinedAt || now),
-        lastSeenAt: now,
-        connected: true
-      });
+      if (!existingSnap.exists()) {
+        const latestParticipants = await db.ref(`sessions/${code}/participants`).once('value');
+        const latestCount = latestParticipants.numChildren();
+        if (latestCount >= maxParticipants) {
+          throw limitReachedError(maxParticipants);
+        }
+      }
+
+      const now = Date.now();
+      try {
+        // update() conserve le score et les réponses si un participant déjà inscrit se reconnecte.
+        await participantRef.update({
+          id: participantId,
+          name,
+          joinedAt: Number(existing.joinedAt || now),
+          lastSeenAt: now,
+          connected: true
+        });
+      } catch (error) {
+        const errorCode = String(error?.code || '').toLowerCase();
+        if (!existingSnap.exists() && (errorCode.includes('permission-denied') || errorCode.includes('permission_denied'))) {
+          throw limitReachedError(maxParticipants);
+        }
+        throw error;
+      }
 
       const sessionData = {
         code,
@@ -106,7 +157,7 @@
       };
 
       sessionStorage.setItem('quizSession', JSON.stringify(sessionData));
-      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=61`);
+      window.location.replace(`play.html?code=${encodeURIComponent(code)}&v=92`);
     } catch (error) {
       notify(readableError(error, step), 'error');
     } finally {
@@ -130,5 +181,11 @@
     );
   };
 
-  window.QuizLiveParticipantJoin = { version: VERSION, join, normalizeCode, cleanName };
+  window.QuizLiveParticipantJoin = {
+    version: VERSION,
+    join,
+    normalizeCode,
+    cleanName,
+    participantLimit
+  };
 })();
