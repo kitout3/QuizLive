@@ -3,7 +3,7 @@
 
   const auth = window.QuizLiveFirebase?.organizerAuth || firebase.auth();
   const db = window.QuizLiveFirebase?.organizerDatabase || database;
-  const ADMIN_BOOT_VERSION = '85';
+  const ADMIN_BOOT_VERSION = '86';
 
   function generateCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
