@@ -81,7 +81,7 @@
             <div id="questionList" class="question-list"></div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px;">
                 <button class="add-question-btn" onclick="showAddQuestionModal()">+ Ajouter une question</button>
-                <button class="add-question-btn" onclick="showImportSlidesModal()" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">🖼️ Importer des slides</button>
+                <button class="add-question-btn" onclick="showImportSlidesModal()" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">📄 Importer PDF</button>
                 <button class="import-excel-btn" onclick="showImportExcelModal()">📊 Importer Excel</button>
                 <button class="add-question-btn" onclick="showSaveModal()" style="border-color: var(--accent); color: var(--accent);">💾 Sauvegarder / Charger</button>
             </div>
@@ -113,7 +113,7 @@
     </main>
 
     <div id="addQuestionModal" class="modal">
-        <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-content" style="max-width: 650px;">
             <button class="modal-close" onclick="closeModals()">&times;</button>
             <h2>➕ Nouvelle question</h2>
             <form id="addQuestionForm" onsubmit="saveQuestion(event)">
@@ -123,6 +123,7 @@
                     <button type="button" class="type-btn" data-type="truefalse" onclick="selectQuestionType('truefalse')"><span class="type-icon">✓✗</span>Vrai/Faux</button>
                     <button type="button" class="type-btn" data-type="wordcloud" onclick="selectQuestionType('wordcloud')"><span class="type-icon">☁️</span>Nuage de mots</button>
                     <button type="button" class="type-btn" data-type="ranking" onclick="selectQuestionType('ranking')"><span class="type-icon">📊</span>Classement</button>
+                    <button type="button" class="type-btn" data-type="image" onclick="selectQuestionType('image')"><span class="type-icon">🖼️</span>Image</button>
                 </div>
                 <div class="form-group">
                     <label>Texte de la question</label>
@@ -135,7 +136,7 @@
     </div>
 
     <div id="editQuestionModal" class="modal">
-        <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-content" style="max-width: 650px;">
             <button class="modal-close" onclick="closeModals()">&times;</button>
             <h2>✏️ Modifier la question</h2>
             <form id="editQuestionForm" onsubmit="updateQuestion(event)">
@@ -173,16 +174,16 @@
     <div id="importSlidesModal" class="modal">
         <div class="modal-content" style="max-width: 550px;">
             <button class="modal-close" onclick="closeModals()">&times;</button>
-            <h2>🖼️ Importer des slides</h2>
+            <h2>📄 Importer des slides depuis un PDF</h2>
             <div class="import-instructions">
-                <p style="color: var(--text-secondary); margin-bottom: 16px;">Importez des images de vos slides PowerPoint pour les afficher entre les questions.</p>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">💡 Astuce : Exportez vos slides PowerPoint en images (PNG/JPG) avant de les importer ici.<br>Dans PowerPoint : Fichier → Exporter → Images</p>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">Importez directement votre présentation au format PDF. Chaque page sera transformée en une slide QuizLive.</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.6;">💡 PowerPoint : <strong>Fichier → Exporter → Créer un document PDF/XPS</strong>.<br>Une page PDF = une slide. Maximum 40 pages.</p>
             </div>
             <div class="form-group" style="margin-top: 24px;">
-                <label class="file-input-label" for="slidesFileInput">📁 Sélectionner des images</label>
-                <input type="file" id="slidesFileInput" accept="image/*" multiple onchange="handleSlidesImport(event)" style="display: none;">
+                <label class="file-input-label" for="slidesFileInput">📄 Sélectionner un fichier PDF</label>
+                <input type="file" id="slidesFileInput" accept="application/pdf,.pdf" onchange="handleSlidesImport(event)" style="display: none;">
             </div>
-            <button id="importSlidesBtn" class="btn-primary" onclick="document.getElementById('slidesFileInput').click()">Sélectionner les images</button>
+            <button id="importSlidesBtn" class="btn-primary" onclick="document.getElementById('slidesFileInput').click()">Sélectionner le PDF</button>
         </div>
     </div>
 
@@ -212,5 +213,7 @@
     <script src="js/config.js?v=69"></script>
     <script src="js/admin-group-access-v1.js?v=69"></script>
     <script src="js/app.js?v=69"></script>
+    <script src="js/image-question-v83.js?v=88"></script>
+    <script src="js/pdf-slide-import-v88.js?v=88"></script>
 </body>
 </html>
