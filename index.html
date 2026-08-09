@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>QuizLive - Quiz Interactif en Direct</title>
-    <link rel="stylesheet" href="css/style.css?v=87">
-    <link rel="stylesheet" href="css/create-group-select.css?v=87">
+    <link rel="stylesheet" href="css/style.css?v=77">
+    <link rel="stylesheet" href="css/create-group-select.css?v=77">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body class="home-page">
@@ -16,6 +15,6 @@
     <div id="createModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeModals()">&times;</button><h2>🎯 Créer un nouveau Quiz</h2><div id="adminLoginStep"><p class="modal-info">🔒 Connexion administrateur requise</p><div class="form-group"><label>Email admin</label><input type="email" id="createAdminEmail" required></div><div class="form-group"><label>Mot de passe</label><input type="password" id="createAdminPass" required></div><div id="createLoginErr" class="error-message"></div><button type="button" class="btn-primary" onclick="loginAdminForCreate()">🔐 Se connecter</button></div><div id="createSessionStep" style="display:none"><form id="createForm" onsubmit="createQuizAfterLogin(event)"><div class="form-group"><label>Nom de votre session</label><input type="text" id="sessionName" required></div><div class="form-group"><label>Votre pseudo</label><input type="text" id="adminName" required></div><button type="submit" class="btn-primary">🚀 Créer la session</button></form></div></div></div>
     <div id="joinModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeModals()">&times;</button><h2>🚀 Rejoindre un Quiz</h2><form id="joinForm" onsubmit="joinQuiz(event)"><div class="form-group"><label>Code de la session</label><input type="text" id="sessionCode" maxlength="6" style="text-transform:uppercase" required></div><div class="form-group"><label>Votre pseudo</label><input type="text" id="playerName" maxlength="30" required></div><button type="submit" class="btn-primary">Rejoindre</button></form></div></div>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="js/config.js?v=87"></script><script src="js/enterprise-email-invites-fix.js?v=87"></script><script src="js/dashboard-entitlements-v77.js?v=87"></script><script src="js/group-runtime-v6.js?v=87"></script><script src="js/create-group-select-v2.js?v=87"></script><script src="js/home-runtime-v1.js?v=87"></script><script src="js/session-create-v2.js?v=87"></script><script src="js/participant-join-v3.js?v=87"></script>
+    <script src="js/config.js?v=77"></script><script src="js/enterprise-email-invites-fix.js?v=77"></script><script src="js/dashboard-entitlements-v77.js?v=77"></script><script src="js/group-runtime-v6.js?v=77"></script><script src="js/create-group-select-v2.js?v=77"></script><script src="js/home-runtime-v1.js?v=77"></script><script src="js/session-create-v2.js?v=77"></script><script src="js/participant-join-v3.js?v=77"></script>
 </body>
 </html>
