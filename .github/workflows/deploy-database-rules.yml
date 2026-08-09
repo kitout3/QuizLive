@@ -1,0 +1,45 @@
+name: Déployer les règles Firebase Database
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - database.rules.json
+      - firebase.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quizlive-database-rules-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Déployer les règles Realtime Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Configurer Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Authentification Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_QUIZLIVE_APP }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Installer Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Déployer les règles Realtime Database
+        run: firebase deploy --only database --project quizlive-app --non-interactive
