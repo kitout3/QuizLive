@@ -1,0 +1,113 @@
+name: Simuler 10 connexions - 4AY5PM
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/simulate-10-participants-4AY5PM.yml
+
+permissions:
+  contents: write
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Simuler 10 participants
+        env:
+          SESSION_CODE: 4AY5PM
+          DATABASE_URL: https://quizlive-app-default-rtdb.europe-west1.firebasedatabase.app
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const code = process.env.SESSION_CODE;
+          const base = process.env.DATABASE_URL;
+          const sessionUrl = `${base}/sessions/${code}.json`;
+
+          async function readJson(url) {
+            const res = await fetch(url);
+            const text = await res.text();
+            let body = null;
+            try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+            return { res, body };
+          }
+
+          async function main() {
+            const before = await readJson(sessionUrl);
+            if (!before.res.ok || !before.body) {
+              throw new Error(`Session ${code} introuvable ou illisible (${before.res.status}).`);
+            }
+
+            const startingParticipants = Object.keys(before.body.participants || {}).length;
+            const maxParticipants = Number(before.body.maxParticipants || 10);
+            const attempts = [];
+            const stamp = Date.now();
+
+            for (let i = 1; i <= 10; i++) {
+              const suffix = String(i).padStart(2, '0');
+              const id = `sim_${code}_${stamp}_${suffix}`;
+              const participant = {
+                id,
+                name: `TEST-${suffix}`,
+                joinedAt: Date.now(),
+                lastSeenAt: Date.now(),
+                connected: true
+              };
+
+              const res = await fetch(`${base}/sessions/${code}/participants/${id}.json`, {
+                method: 'PUT',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(participant)
+              });
+              const text = await res.text();
+              attempts.push({
+                participant: participant.name,
+                id,
+                httpStatus: res.status,
+                accepted: res.ok,
+                response: text.slice(0, 500)
+              });
+            }
+
+            const after = await readJson(sessionUrl);
+            const endingParticipants = Object.keys((after.body || {}).participants || {}).length;
+            const accepted = attempts.filter(x => x.accepted).length;
+            const refused = attempts.length - accepted;
+
+            const result = {
+              sessionCode: code,
+              testedAt: new Date().toISOString(),
+              sessionName: before.body.name || '',
+              status: before.body.status || '',
+              maxParticipants,
+              startingParticipants,
+              attemptsRequested: 10,
+              accepted,
+              refused,
+              endingParticipants,
+              attempts
+            };
+
+            fs.mkdirSync('test-results', { recursive: true });
+            fs.writeFileSync(`test-results/${code}-10-connections.json`, JSON.stringify(result, null, 2) + '\n');
+            console.log(JSON.stringify(result, null, 2));
+          }
+
+          main().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Enregistrer le résultat
+        run: |
+          git config user.name "quizlive-test-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add test-results/4AY5PM-10-connections.json
+          git commit -m "Record 10 participant simulation for 4AY5PM"
+          git push
